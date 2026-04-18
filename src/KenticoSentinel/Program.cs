@@ -1,11 +1,21 @@
+using System.Reflection;
 using RefinedElement.Kentico.Sentinel.Commands;
 using Spectre.Console.Cli;
+
+// Read the version from the assembly so `sentinel --version` always matches the published
+// NuGet version. CI sets this via `-p:Version=...` during pack; local Debug builds fall back
+// to the csproj default.
+var informationalVersion = typeof(Program).Assembly
+    .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
+    ?? "unknown";
+// Strip SourceLink commit suffix ("0.1.2-alpha+abc123") for display.
+var cliVersion = informationalVersion.Split('+', 2)[0];
 
 var app = new CommandApp();
 app.Configure(config =>
 {
     config.SetApplicationName("sentinel");
-    config.SetApplicationVersion("0.1.0-alpha");
+    config.SetApplicationVersion(cliVersion);
 
     config.AddCommand<ScanCommand>("scan")
         .WithDescription("Scan an Xperience by Kentico project (XbyK 29+) for health issues. Does not support Kentico Xperience 13.")
