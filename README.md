@@ -1,21 +1,37 @@
 # Kentico Sentinel
 
-> Static + runtime health scanner for Xperience by Kentico projects. **ESLint for Kentico.**
+<img src="docs/logo.svg" alt="Kentico Sentinel" width="48" align="left" style="margin-right:12px">
 
-Free, open-source CLI that scans any XbyK project and reports unused content types, orphaned content items, outdated packages, config smells, stale assets, and a dozen other things the Kentico admin UI doesn't surface.
+> **Health scanner for Xperience by Kentico projects.** ESLint for XbyK.
 
-Built by [Refined Element](https://refinedelement.com) — AI-driven Xperience by Kentico consultancy, Kentico Community Leaders 2025 & 2026.
+Free, open-source CLI that scans any Xperience by Kentico project and reports unused content types, orphaned content items, outdated packages, config smells, stale assets, recent `CMS_EventLog` errors, and a dozen other things the Kentico admin UI doesn't surface.
+
+Built by [Refined Element](https://refinedelement.com) — Kentico Community Leaders 2025 & 2026.
+
+### Supported Kentico versions
+
+| Version | Supported | Notes |
+|---------|-----------|-------|
+| **Xperience by Kentico 29+** | ✅ Full support | The tool is built for XbyK. All 11 checks run. |
+| Kentico Xperience 13 | ❌ Not supported | KX13 uses the legacy content tree (`CMS_Document` / `CMS_Tree`) and ASP.NET 4.x config patterns. A separate scanner would be needed; we have no plans to build one. |
+| Kentico 12 and earlier | ❌ Not supported | End of mainstream support. |
+
+If you're on KX13 or older, this tool won't help you. Please don't [open an issue](https://github.com/refined-element/kentico-sentinel/issues) asking us to backport.
 
 ## Quick Start
 
 ```bash
-dotnet tool install -g RefinedElement.Kentico.Sentinel
+# Prerelease until v1.0 — use --prerelease or an explicit version.
+dotnet tool install -g RefinedElement.Kentico.Sentinel --prerelease
 
-# Static code checks only
-sentinel scan --path ./MyKenticoSite
+# Static code checks only (works against XbyK 29+)
+sentinel scan --path ./MyXperienceSite
 
-# Full scan (code + runtime content checks)
-sentinel scan --path ./MyKenticoSite --connection-string "Server=...;Database=..."
+# Full scan (code + runtime content checks — requires an XbyK database)
+sentinel scan --path ./MyXperienceSite --connection-string "Server=...;Database=..."
+
+# Scan a GitHub repo directly (shallow-cloned to a temp dir, cleaned up after)
+sentinel scan --repo owner/your-xbyk-site
 
 # Email the sanitized report to Refined Element for a one-time remediation quote
 sentinel quote --report ./sentinel-report/report.json

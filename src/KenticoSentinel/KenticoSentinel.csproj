@@ -16,8 +16,8 @@
     <Version>0.1.0-alpha</Version>
     <Authors>Refined Element</Authors>
     <Company>Refined Element</Company>
-    <Description>Static + runtime health scanner for Xperience by Kentico projects. ESLint for Kentico.</Description>
-    <PackageTags>kentico;xperience-by-kentico;linter;scanner;health-check</PackageTags>
+    <Description>Health scanner for Xperience by Kentico projects (XbyK 29+). Free, open-source CLI that reports config smells, middleware-order bugs, outdated NuGet packages, unused content types, orphaned content items, stale content, broken assets, malformed Page Builder widgets, and recent EventLog errors. Does NOT support Kentico Xperience 13 — XbyK only.</Description>
+    <PackageTags>xperience-by-kentico;xbyk;kentico;linter;scanner;health-check;cms</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/refined-element/kentico-sentinel</PackageProjectUrl>
     <RepositoryUrl>https://github.com/refined-element/kentico-sentinel</RepositoryUrl>

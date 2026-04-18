@@ -66,14 +66,25 @@ public static class HtmlReportWriter
         return JsonSerializer.Serialize(shape, EmbedOptions);
     }
 
-    // Sonar-ping mark: a solid source point with three expanding arcs, evoking "watching and scanning."
-    // Uses currentColor so it inherits whatever text colour the surrounding context provides.
+    // Radar display mark: circular bezel with range rings, faint crosshair, a filled sweep wedge,
+    // and a single detected target blip. Uses currentColor so the brand accent of the surrounding
+    // context drives the colour.
     private const string LogoSvg =
-        "<svg class=\"mark\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"2.5\">" +
-        "<circle cx=\"9\" cy=\"16\" r=\"2.75\" fill=\"currentColor\" stroke=\"none\"/>" +
-        "<path d=\"M13 11.5 A 6 6 0 0 1 13 20.5\"/>" +
-        "<path d=\"M18 8 A 11 11 0 0 1 18 24\" opacity=\"0.75\"/>" +
-        "<path d=\"M23 4.5 A 16 16 0 0 1 23 27.5\" opacity=\"0.5\"/>" +
+        "<svg class=\"mark\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\">" +
+        // Sweep wedge (filled, ~60deg from 12 to 2 o'clock, drawn first so rings overlay).
+        "<path d=\"M 16 16 L 16 2 A 14 14 0 0 1 29 10 Z\" fill=\"currentColor\" opacity=\"0.28\" stroke=\"none\"/>" +
+        // Crosshair.
+        "<line x1=\"2\" y1=\"16\" x2=\"30\" y2=\"16\" stroke-width=\"0.5\" opacity=\"0.3\"/>" +
+        "<line x1=\"16\" y1=\"2\" x2=\"16\" y2=\"30\" stroke-width=\"0.5\" opacity=\"0.3\"/>" +
+        // Range rings.
+        "<circle cx=\"16\" cy=\"16\" r=\"14\" stroke-width=\"1.75\"/>" +
+        "<circle cx=\"16\" cy=\"16\" r=\"9\" stroke-width=\"0.75\" opacity=\"0.55\"/>" +
+        "<circle cx=\"16\" cy=\"16\" r=\"4.5\" stroke-width=\"0.75\" opacity=\"0.55\"/>" +
+        // Sweep leading edge.
+        "<line x1=\"16\" y1=\"16\" x2=\"29\" y2=\"10\" stroke-width=\"1.75\" stroke-linecap=\"round\"/>" +
+        // Center dot + detected blip.
+        "<circle cx=\"16\" cy=\"16\" r=\"1.5\" fill=\"currentColor\" stroke=\"none\"/>" +
+        "<circle cx=\"21\" cy=\"10\" r=\"1.3\" fill=\"currentColor\" stroke=\"none\"/>" +
         "</svg>";
 
     private static void RenderHeader(StringBuilder sb, ReportDocument doc)
@@ -242,17 +253,17 @@ public static class HtmlReportWriter
 
     private const string Css = """
         :root {
-            --bg: #0d1117;
+            --bg: #0a0a0f;
             --panel: #161b22;
             --panel-border: #30363d;
             --text: #e6edf3;
             --muted: #8b949e;
-            --accent: #4f46e5;
-            --accent-2: #22d3ee;
+            --accent: #afd66d;
+            --accent-2: #D6F08D;
             --error: #f85149;
             --warning: #d29922;
             --info: #8b949e;
-            --ok: #3fb950;
+            --ok: #4ade80;
         }
         * { box-sizing: border-box; }
         html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font: 15px/1.55 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }
@@ -320,7 +331,7 @@ public static class HtmlReportWriter
         .submit input[type=email] { padding: 10px 14px; font-size: 14px; background: var(--bg); color: var(--text); border: 1px solid var(--panel-border); border-radius: 6px; font-family: inherit; }
         .submit input[type=email]:focus { border-color: var(--accent-2); outline: none; }
         .submit button { padding: 10px 18px; font-size: 14px; font-weight: 600; background: var(--accent-2); color: var(--bg); border: 0; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
-        .submit button:hover:not(:disabled) { background: #67e8f9; }
+        .submit button:hover:not(:disabled) { background: #c4de7b; }
         .submit button:disabled { opacity: 0.5; cursor: not-allowed; }
         #sentinel-result { margin-top: 14px; padding: 12px 14px; border-radius: 6px; font-size: 14px; display: none; }
         #sentinel-result.pending { display: block; background: rgba(139,148,158,0.12); color: var(--muted); }
