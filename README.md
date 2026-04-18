@@ -33,6 +33,33 @@ the wrapper script resolves it automatically:
 Iterating on the scanner itself? `scripts/dev-reinstall.ps1` packs the current source, reinstalls
 the global tool, and leaves you ready to re-run `sentinel`.
 
+## What you'll see
+
+A real scan against a production XbyK 31.0.1 site takes about **3 seconds** end-to-end and yields
+output like:
+
+```
+╭──────────────────────────┬──────────────────────────╮
+│ Metric                   │ Value                    │
+├──────────────────────────┼──────────────────────────┤
+│ Repo                     │ F:\RefinedElement\re-xbk │
+│ Runtime checks           │ enabled                  │
+│ Duration                 │ 3.25s                    │
+│ Checks executed          │ 10                       │
+│ Errors                   │ 0                        │
+│ Warnings                 │ 3                        │
+│ Info                     │ 12                       │
+╰──────────────────────────┴──────────────────────────╯
+  WARNING  CFG003  '_comment_secrets' contains a plaintext secret…  (false-positive — now suppressed)
+  WARNING  DEP001  Stripe.net: 50.1.0 → 51.0.0
+  WARNING  DEP001  Microsoft.EntityFrameworkCore.SqlServer: 9.0.0 → 10.0.6
+  INFO     CNT001  Content type 'LandingPage' has zero content items.
+  INFO     CNT002  Reusable content item 'Content_TestBlogPost-…' has no inbound references.
+  INFO     VER001  Kentico.Xperience.WebApp is on 31.0.1; latest is 31.4.0.
+```
+
+The HTML report is self-contained (no external CSS/JS) and Refined Element-branded.
+
 ## What It Checks (v1)
 
 ### Static — free, no database needed
@@ -83,6 +110,18 @@ MIT © 2026 [Refined Element](https://refinedelement.com)
 ## Contributing
 
 Issues and PRs welcome. New check ideas especially — the goal is to be **the** XbyK scanner.
+
+### Dev loop
+
+```bash
+dotnet build              # quick compile
+dotnet test               # 19 unit tests across checks, sanitizer, and runner
+./scripts/dev-reinstall.ps1  # pack + reinstall the global tool
+./scripts/scan.ps1 -Project F:\RefinedElement\re-xbk  # verify against a real site
+```
+
+Each check is a single class in `src/KenticoSentinel/Checks/` implementing `ICheck`. Register it in
+`Core/CheckRegistry.cs` and it ships in the next run.
 
 ## Links
 
