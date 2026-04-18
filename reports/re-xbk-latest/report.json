@@ -1,0 +1,225 @@
+{
+  "sentinelVersion": "0.1.0-alpha",
+  "scan": {
+    "startedAt": "2026-04-18T07:13:54.5608347+00:00",
+    "completedAt": "2026-04-18T07:13:58.2970562+00:00",
+    "durationSeconds": 3.736,
+    "repoPath": "F:\\RefinedElement\\re-xbk",
+    "runtimeEnabled": true
+  },
+  "summary": {
+    "total": 15,
+    "errors": 0,
+    "warnings": 3,
+    "info": 12
+  },
+  "executions": [
+    {
+      "ruleId": "CFG001",
+      "title": "CMSHashStringSalt configuration",
+      "kind": "Static",
+      "status": "Ran",
+      "durationMs": 14.6
+    },
+    {
+      "ruleId": "CFG002",
+      "title": "Kentico middleware pipeline order",
+      "kind": "Static",
+      "status": "Ran",
+      "durationMs": 14.5
+    },
+    {
+      "ruleId": "CFG003",
+      "title": "Plaintext secrets in appsettings.json",
+      "kind": "Static",
+      "status": "Ran",
+      "durationMs": 2
+    },
+    {
+      "ruleId": "DEP001",
+      "title": "Outdated NuGet packages",
+      "kind": "Static",
+      "status": "Ran",
+      "durationMs": 3249.2
+    },
+    {
+      "ruleId": "VER001",
+      "title": "Xperience by Kentico version",
+      "kind": "Static",
+      "status": "Ran",
+      "durationMs": 264.7
+    },
+    {
+      "ruleId": "CNT001",
+      "title": "Unused content types",
+      "kind": "Runtime",
+      "status": "Ran",
+      "durationMs": 157
+    },
+    {
+      "ruleId": "CNT002",
+      "title": "Orphaned reusable content items",
+      "kind": "Runtime",
+      "status": "Ran",
+      "durationMs": 7.7
+    },
+    {
+      "ruleId": "CNT003",
+      "title": "Stale content",
+      "kind": "Runtime",
+      "status": "Ran",
+      "durationMs": 16.4
+    },
+    {
+      "ruleId": "CNT004",
+      "title": "Broken media file references",
+      "kind": "Runtime",
+      "status": "Ran",
+      "durationMs": 5.1
+    },
+    {
+      "ruleId": "CNT005",
+      "title": "Malformed Page Builder widget data",
+      "kind": "Runtime",
+      "status": "Ran",
+      "durationMs": 3.1
+    }
+  ],
+  "findings": [
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Info",
+      "message": "kentico.xperience.admin: 31.0.1 \u2192 31.4.0",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package kentico.xperience.admin --version 31.4.0\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Info",
+      "message": "kentico.xperience.azurestorage: 31.0.1 \u2192 31.4.0",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package kentico.xperience.azurestorage --version 31.4.0\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Info",
+      "message": "kentico.xperience.imageprocessing: 31.0.1 \u2192 31.4.0",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package kentico.xperience.imageprocessing --version 31.4.0\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Info",
+      "message": "kentico.xperience.webapp: 31.0.1 \u2192 31.4.0",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package kentico.xperience.webapp --version 31.4.0\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Warning",
+      "message": "Microsoft.ApplicationInsights.AspNetCore: 2.23.0 \u2192 3.1.0",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package Microsoft.ApplicationInsights.AspNetCore --version 3.1.0\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Warning",
+      "message": "Microsoft.EntityFrameworkCore.SqlServer: 9.0.0 \u2192 10.0.6",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package Microsoft.EntityFrameworkCore.SqlServer --version 10.0.6\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Info",
+      "message": "Microsoft.Extensions.Http.Resilience: 10.3.0 \u2192 10.5.0",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package Microsoft.Extensions.Http.Resilience --version 10.5.0\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Warning",
+      "message": "Stripe.net: 50.1.0 \u2192 51.0.0",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package Stripe.net --version 51.0.0\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "DEP001",
+      "ruleTitle": "Outdated NuGet packages",
+      "category": "Dependencies",
+      "severity": "Info",
+      "message": "Swashbuckle.AspNetCore: 10.1.3 \u2192 10.1.7",
+      "location": "F:/RefinedElement/re-xbk/re-xbk.csproj",
+      "remediation": "Update with \u0060dotnet add F:/RefinedElement/re-xbk/re-xbk.csproj package Swashbuckle.AspNetCore --version 10.1.7\u0060 after validating compatibility."
+    },
+    {
+      "ruleId": "VER001",
+      "ruleTitle": "Xperience by Kentico version",
+      "category": "Dependencies",
+      "severity": "Info",
+      "message": "Xperience by Kentico Kentico.Xperience.WebApp is on 31.0.1; latest on NuGet is 31.4.0.",
+      "location": "F:\\RefinedElement\\re-xbk\\re-xbk.csproj",
+      "remediation": "Update via \u0060dotnet add package Kentico.Xperience.WebApp --version 31.4.0\u0060 after reviewing the release notes at https://docs.kentico.com."
+    },
+    {
+      "ruleId": "CNT001",
+      "ruleTitle": "Unused content types",
+      "category": "Content Model",
+      "severity": "Info",
+      "message": "Content type \u0027LandingPage\u0027 (ReXBK.LandingPage, Website) has zero content items.",
+      "location": "CMS_Class.ClassName=ReXBK.LandingPage",
+      "remediation": "Delete the content type in the Kentico admin if genuinely unused, or create the first item. Refined Element can also sweep these in a paid cleanup engagement."
+    },
+    {
+      "ruleId": "CNT002",
+      "ruleTitle": "Orphaned reusable content items",
+      "category": "Content Model",
+      "severity": "Info",
+      "message": "Reusable content item \u0027Content_TestBlogPostFromAPI-4ol8bjly\u0027 (ArticleContent) has no inbound references.",
+      "location": "CMS_ContentItem.ContentItemID=96",
+      "remediation": "Review in Content Hub. If genuinely unused, delete or archive. Paid tier can bulk-unpublish these after an age threshold."
+    },
+    {
+      "ruleId": "CNT002",
+      "ruleTitle": "Orphaned reusable content items",
+      "category": "Content Model",
+      "severity": "Info",
+      "message": "Reusable content item \u0027Content_TestBlogPostFromAPI-u947d0p6\u0027 (ArticleContent) has no inbound references.",
+      "location": "CMS_ContentItem.ContentItemID=94",
+      "remediation": "Review in Content Hub. If genuinely unused, delete or archive. Paid tier can bulk-unpublish these after an age threshold."
+    },
+    {
+      "ruleId": "CNT002",
+      "ruleTitle": "Orphaned reusable content items",
+      "category": "Content Model",
+      "severity": "Info",
+      "message": "Reusable content item \u0027Content_BlogSectionBanner\u0027 (BannerContent) has no inbound references.",
+      "location": "CMS_ContentItem.ContentItemID=80",
+      "remediation": "Review in Content Hub. If genuinely unused, delete or archive. Paid tier can bulk-unpublish these after an age threshold."
+    },
+    {
+      "ruleId": "CNT002",
+      "ruleTitle": "Orphaned reusable content items",
+      "category": "Content Model",
+      "severity": "Info",
+      "message": "Reusable content item \u0027Content_ProductsSectionBanner\u0027 (BannerContent) has no inbound references.",
+      "location": "CMS_ContentItem.ContentItemID=75",
+      "remediation": "Review in Content Hub. If genuinely unused, delete or archive. Paid tier can bulk-unpublish these after an age threshold."
+    }
+  ]
+}

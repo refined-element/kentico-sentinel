@@ -21,6 +21,18 @@ sentinel scan --path ./MyKenticoSite --connection-string "Server=...;Database=..
 sentinel quote --report ./sentinel-report/report.json
 ```
 
+## Convenience scripts
+
+If your project uses `dotnet user-secrets` for its connection string (the Kentico-recommended default),
+the wrapper script resolves it automatically:
+
+```powershell
+./scripts/scan.ps1 -Project F:\RefinedElement\re-xbk -StaleDays 365 -OpenReport
+```
+
+Iterating on the scanner itself? `scripts/dev-reinstall.ps1` packs the current source, reinstalls
+the global tool, and leaves you ready to re-run `sentinel`.
+
 ## What It Checks (v1)
 
 ### Static — free, no database needed
