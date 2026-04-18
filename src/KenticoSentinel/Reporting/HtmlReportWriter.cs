@@ -66,10 +66,20 @@ public static class HtmlReportWriter
         return JsonSerializer.Serialize(shape, EmbedOptions);
     }
 
+    // Sonar-ping mark: a solid source point with three expanding arcs, evoking "watching and scanning."
+    // Uses currentColor so it inherits whatever text colour the surrounding context provides.
+    private const string LogoSvg =
+        "<svg class=\"mark\" viewBox=\"0 0 32 32\" xmlns=\"http://www.w3.org/2000/svg\" aria-hidden=\"true\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-width=\"2.5\">" +
+        "<circle cx=\"9\" cy=\"16\" r=\"2.75\" fill=\"currentColor\" stroke=\"none\"/>" +
+        "<path d=\"M13 11.5 A 6 6 0 0 1 13 20.5\"/>" +
+        "<path d=\"M18 8 A 11 11 0 0 1 18 24\" opacity=\"0.75\"/>" +
+        "<path d=\"M23 4.5 A 16 16 0 0 1 23 27.5\" opacity=\"0.5\"/>" +
+        "</svg>";
+
     private static void RenderHeader(StringBuilder sb, ReportDocument doc)
     {
         sb.Append("<header class=\"hero\">");
-        sb.Append("<div class=\"brand\"><span class=\"mark\">⚡</span> Kentico Sentinel</div>");
+        sb.Append("<div class=\"brand\">").Append(LogoSvg).Append(" Kentico Sentinel</div>");
         sb.Append("<div class=\"tagline\">Static + runtime health scan for Xperience by Kentico</div>");
         sb.Append("<div class=\"meta\">");
         sb.Append("<div><span>Scanned</span> ").Append(Html(doc.Scan.RepoPath)).Append("</div>");
@@ -252,8 +262,8 @@ public static class HtmlReportWriter
         code, .mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 13px; }
 
         .hero { border-bottom: 1px solid var(--panel-border); padding-bottom: 24px; margin-bottom: 28px; }
-        .hero .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; }
-        .hero .mark { color: var(--accent-2); margin-right: 4px; }
+        .hero .brand { font-size: 22px; font-weight: 700; letter-spacing: -0.01em; display: flex; align-items: center; gap: 10px; }
+        .hero .mark { width: 28px; height: 28px; color: var(--accent-2); flex-shrink: 0; }
         .hero .tagline { color: var(--muted); margin-top: 4px; }
         .hero .meta { margin-top: 18px; display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px 24px; color: var(--muted); font-size: 13px; }
         .hero .meta span { color: var(--text); margin-right: 6px; font-weight: 600; }
