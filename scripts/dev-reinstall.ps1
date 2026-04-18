@@ -25,7 +25,12 @@ Write-Host "==> Uninstalling global tool (if present)" -ForegroundColor Cyan
 & dotnet tool uninstall -g RefinedElement.Kentico.Sentinel 2>$null | Out-Null
 
 Write-Host "==> Installing global tool from $packageOutputDir" -ForegroundColor Cyan
-& dotnet tool install -g --add-source $packageOutputDir RefinedElement.Kentico.Sentinel | Out-Host
+# Resolve the latest packed version (needed because prerelease versions require explicit --version).
+$nupkg = Get-ChildItem -Path $packageOutputDir -Filter 'RefinedElement.Kentico.Sentinel.*.nupkg' |
+    Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $nupkg) { throw "No .nupkg found in $packageOutputDir after pack." }
+$version = [regex]::Match($nupkg.Name, 'RefinedElement\.Kentico\.Sentinel\.(.+)\.nupkg').Groups[1].Value
+& dotnet tool install -g --add-source $packageOutputDir RefinedElement.Kentico.Sentinel --version $version | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "dotnet tool install failed." }
 
 Write-Host "==> Installed. Run 'sentinel --version' to verify." -ForegroundColor Green

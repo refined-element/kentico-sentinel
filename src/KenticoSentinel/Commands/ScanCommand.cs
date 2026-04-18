@@ -1,4 +1,5 @@
 using System.ComponentModel;
+using RefinedElement.Kentico.Sentinel.Cloning;
 using RefinedElement.Kentico.Sentinel.Core;
 using RefinedElement.Kentico.Sentinel.Infrastructure;
 using RefinedElement.Kentico.Sentinel.Reporting;
@@ -14,6 +15,18 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
         [Description("Path to the Xperience by Kentico project root (folder containing the .csproj).")]
         [CommandOption("-p|--path")]
         public string Path { get; init; } = ".";
+
+        [Description("Repository to scan instead of --path. Accepts owner/name, github.com/owner/name, or a full URL. Shallow-cloned into a temp dir and removed after the scan.")]
+        [CommandOption("--repo")]
+        public string? Repo { get; init; }
+
+        [Description("Branch, tag, or ref to check out when using --repo. Defaults to the repo's default branch.")]
+        [CommandOption("--ref")]
+        public string? Ref { get; init; }
+
+        [Description("Keep the temporary clone directory instead of deleting it after the scan. Useful for debugging.")]
+        [CommandOption("--keep-clone")]
+        public bool KeepClone { get; init; }
 
         [Description("SQL Server connection string for runtime content checks. If omitted, only static code checks run.")]
         [CommandOption("-c|--connection-string")]
@@ -34,17 +47,45 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
 
     protected override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
-        var repoPath = System.IO.Path.GetFullPath(settings.Path);
-        if (!Directory.Exists(repoPath))
-        {
-            AnsiConsole.MarkupLine($"[red]Path not found:[/] {repoPath}");
-            return 2;
-        }
-
         if (!Enum.TryParse<Severity>(settings.FailOn, ignoreCase: true, out var failOn))
         {
             AnsiConsole.MarkupLine($"[red]Invalid --fail-on value '{settings.FailOn}'. Use info, warning, or error.[/]");
             return 2;
+        }
+
+        string repoPath;
+        string? cloneToCleanup = null;
+
+        if (!string.IsNullOrWhiteSpace(settings.Repo))
+        {
+            string url;
+            try { url = GitRepoUrl.Normalize(settings.Repo); }
+            catch (ArgumentException ex)
+            {
+                AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
+                return 2;
+            }
+
+            AnsiConsole.MarkupLine($"[dim]Cloning [cyan]{Markup.Escape(url)}[/]{(settings.Ref is null ? "" : $" at [cyan]{Markup.Escape(settings.Ref)}[/]")}…[/]");
+            var cloner = new GitCloner();
+            var clone = await cloner.CloneAsync(url, settings.Ref, cancellationToken).ConfigureAwait(false);
+            if (!clone.Success || clone.ClonePath is null)
+            {
+                AnsiConsole.MarkupLine($"[red]Clone failed:[/] {Markup.Escape(clone.ErrorMessage ?? "unknown error")}");
+                return 2;
+            }
+
+            repoPath = clone.ClonePath;
+            if (!settings.KeepClone) cloneToCleanup = repoPath;
+        }
+        else
+        {
+            repoPath = System.IO.Path.GetFullPath(settings.Path);
+            if (!Directory.Exists(repoPath))
+            {
+                AnsiConsole.MarkupLine($"[red]Path not found:[/] {repoPath}");
+                return 2;
+            }
         }
 
         using var httpFactory = new SingleHttpClientFactory();
@@ -84,6 +125,15 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
         AnsiConsole.MarkupLine($"\n[green]✓[/] Reports written to [cyan]{outputDir}[/]");
         AnsiConsole.MarkupLine($"  [dim]{jsonPath}[/]");
         AnsiConsole.MarkupLine($"  [dim]{htmlPath}[/]");
+
+        if (cloneToCleanup is not null)
+        {
+            GitCloner.SafeDelete(cloneToCleanup);
+        }
+        else if (settings.KeepClone && !string.IsNullOrWhiteSpace(settings.Repo))
+        {
+            AnsiConsole.MarkupLine($"[dim]Clone kept at {Markup.Escape(repoPath)}[/]");
+        }
 
         return result.MaxSeverity() >= failOn && result.Findings.Count > 0 ? 1 : 0;
     }
