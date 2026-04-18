@@ -2,6 +2,7 @@ using System.ComponentModel;
 using RefinedElement.Kentico.Sentinel.Cloning;
 using RefinedElement.Kentico.Sentinel.Core;
 using RefinedElement.Kentico.Sentinel.Infrastructure;
+using RefinedElement.Kentico.Sentinel.Quoting;
 using RefinedElement.Kentico.Sentinel.Reporting;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -43,6 +44,10 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
         [Description("Fail the process with a non-zero exit code if any finding has severity >= this threshold. One of: info, warning, error.")]
         [CommandOption("--fail-on")]
         public string FailOn { get; init; } = "error";
+
+        [Description("Override the quote endpoint baked into the HTML report's submit button. Also reads the SENTINEL_QUOTE_ENDPOINT env var. Defaults to Refined Element's production endpoint.")]
+        [CommandOption("--quote-endpoint")]
+        public string? QuoteEndpoint { get; init; }
     }
 
     protected override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
@@ -119,8 +124,9 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
         var jsonPath = System.IO.Path.Combine(outputDir, "report.json");
         var htmlPath = System.IO.Path.Combine(outputDir, "report.html");
 
+        var quoteEndpoint = QuoteClient.ResolveEndpoint(settings.QuoteEndpoint);
         await JsonReportWriter.WriteAsync(reportDoc, jsonPath, cancellationToken).ConfigureAwait(false);
-        await HtmlReportWriter.WriteAsync(reportDoc, htmlPath, cancellationToken).ConfigureAwait(false);
+        await HtmlReportWriter.WriteAsync(reportDoc, htmlPath, quoteEndpoint, cancellationToken).ConfigureAwait(false);
 
         AnsiConsole.MarkupLine($"\n[green]✓[/] Reports written to [cyan]{outputDir}[/]");
         AnsiConsole.MarkupLine($"  [dim]{jsonPath}[/]");

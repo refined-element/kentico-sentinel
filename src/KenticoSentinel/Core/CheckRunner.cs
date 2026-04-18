@@ -46,7 +46,12 @@ public sealed class CheckRunner
             {
                 var checkFindings = await check.RunAsync(context, cancellationToken).ConfigureAwait(false);
                 sw.Stop();
-                findings.AddRange(checkFindings);
+                // Stamp each finding with the check's quote eligibility so the sanitizer doesn't need
+                // to re-resolve the check later.
+                foreach (var f in checkFindings)
+                {
+                    findings.Add(f with { QuoteEligible = check.QuoteEligible });
+                }
                 executions.Add(new CheckExecution(
                     check.RuleId,
                     check.Title,

@@ -1,24 +1,40 @@
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using RefinedElement.Kentico.Sentinel.Quoting;
 
 namespace RefinedElement.Kentico.Sentinel.Reporting;
 
 /// <summary>
 /// Emits a self-contained HTML report (inline CSS, no external assets) styled with Refined Element brand
-/// accents. Groups findings by category, ordered by severity.
+/// accents. Groups findings by category, ordered by severity. Includes an embedded email form that POSTs
+/// directly to the Refined Element quote endpoint — no CLI follow-up required.
 /// </summary>
 public static class HtmlReportWriter
 {
-    public static async Task WriteAsync(ReportDocument doc, string outputPath, CancellationToken cancellationToken)
+    private static readonly JsonSerializerOptions EmbedOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+    };
+
+    public static async Task WriteAsync(ReportDocument doc, string outputPath, string quoteEndpoint, CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
-        var html = Render(doc);
+        var html = Render(doc, quoteEndpoint);
         await File.WriteAllTextAsync(outputPath, html, Encoding.UTF8, cancellationToken).ConfigureAwait(false);
     }
 
-    private static string Render(ReportDocument doc)
+    private static string Render(ReportDocument doc, string quoteEndpoint)
     {
-        var sb = new StringBuilder(16 * 1024);
+        // Pre-compute both submission shapes at generation time so the privacy boundary lives in C#,
+        // not browser JS. The email field is stripped out before embedding — the form injects it.
+        var sanitizedPayload = BuildEmbeddedPayload(doc, includeContext: false);
+        var fullPayload = BuildEmbeddedPayload(doc, includeContext: true);
+        var eligibleCount = doc.Findings.Count(f => f.QuoteEligible);
+
+        var sb = new StringBuilder(32 * 1024);
         sb.Append("<!DOCTYPE html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
         sb.Append("<title>Kentico Sentinel Report</title>");
         sb.Append("<style>").Append(Css).Append("</style>");
@@ -28,10 +44,26 @@ public static class HtmlReportWriter
         RenderSummary(sb, doc);
         RenderExecutions(sb, doc);
         RenderFindings(sb, doc);
+        RenderSubmitForm(sb, sanitizedPayload, fullPayload, quoteEndpoint, eligibleCount);
         RenderFooter(sb);
 
         sb.Append("</body></html>");
         return sb.ToString();
+    }
+
+    private static string BuildEmbeddedPayload(ReportDocument doc, bool includeContext)
+    {
+        var submission = QuoteSanitizer.Sanitize(doc, contactEmail: string.Empty, includeContext);
+        // Serialize without the email — the form JS injects it at submission time.
+        var shape = new
+        {
+            sentinelVersion = submission.SentinelVersion,
+            scan = submission.Scan,
+            summary = submission.Summary,
+            findings = submission.Findings,
+            includesContext = submission.IncludesContext,
+        };
+        return JsonSerializer.Serialize(shape, EmbedOptions);
     }
 
     private static void RenderHeader(StringBuilder sb, ReportDocument doc)
@@ -108,6 +140,10 @@ public static class HtmlReportWriter
                 sb.Append("<span class=\"pill ").Append(sev).Append("\">").Append(f.Severity.ToUpperInvariant()).Append("</span>");
                 sb.Append("<span class=\"mono rule\">").Append(Html(f.RuleId)).Append("</span>");
                 sb.Append("<span class=\"title\">").Append(Html(f.RuleTitle)).Append("</span>");
+                if (!f.QuoteEligible)
+                {
+                    sb.Append("<span class=\"pill info\" title=\"Informational only — not included in `sentinel quote` submissions.\">INFO-ONLY</span>");
+                }
                 sb.Append("</div>");
                 sb.Append("<p class=\"message\">").Append(Html(f.Message)).Append("</p>");
                 if (!string.IsNullOrEmpty(f.Location))
@@ -125,12 +161,61 @@ public static class HtmlReportWriter
         sb.Append("</section>");
     }
 
+    private static void RenderSubmitForm(StringBuilder sb, string sanitizedPayload, string fullPayload, string quoteEndpoint, int eligibleCount)
+    {
+        if (eligibleCount == 0)
+        {
+            // Nothing quote-worthy — no submit UI.
+            return;
+        }
+
+        sb.Append("<section class=\"submit\">");
+        sb.Append("<h2>Request a fix quote</h2>");
+        sb.Append("<p class=\"intro\">Send this report directly to <a href=\"https://refinedelement.com\">Refined Element</a>. ");
+        sb.Append("We reply with an itemized, fixed-price remediation estimate within 3–5 business days. ");
+        sb.Append($"{eligibleCount} finding{(eligibleCount == 1 ? "" : "s")} will be included (INFO-ONLY items are excluded automatically).</p>");
+
+        sb.Append("<form id=\"sentinel-submit\" autocomplete=\"on\">");
+        sb.Append("<label for=\"sentinel-email\">Your email</label>");
+        sb.Append("<input type=\"email\" id=\"sentinel-email\" name=\"email\" required placeholder=\"you@yourcompany.com\" autocomplete=\"email\">");
+        sb.Append("<label class=\"check\"><input type=\"checkbox\" id=\"sentinel-include-context\"> Include context (file paths + remediation text) — gives a more accurate quote but reveals more of your repo structure.</label>");
+        sb.Append("<button type=\"submit\">Send report to Refined Element</button>");
+        sb.Append("</form>");
+        sb.Append("<div id=\"sentinel-result\" role=\"status\" aria-live=\"polite\"></div>");
+        sb.Append("</section>");
+
+        // JSON payload islands — the form JS reads whichever matches the checkbox state.
+        sb.Append("<script type=\"application/json\" id=\"sentinel-payload-sanitized\">").Append(sanitizedPayload).Append("</script>");
+        sb.Append("<script type=\"application/json\" id=\"sentinel-payload-full\">").Append(fullPayload).Append("</script>");
+
+        // Form script. Endpoint is JSON-encoded to survive quoting.
+        var endpointJson = JsonSerializer.Serialize(quoteEndpoint, EmbedOptions);
+        sb.Append("<script>(function(){");
+        sb.Append("const form=document.getElementById('sentinel-submit');");
+        sb.Append("const out=document.getElementById('sentinel-result');");
+        sb.Append("const endpoint=").Append(endpointJson).Append(";");
+        sb.Append("form.addEventListener('submit',async e=>{e.preventDefault();");
+        sb.Append("const email=document.getElementById('sentinel-email').value.trim();");
+        sb.Append("if(!email){out.className='err';out.textContent='Email required.';return;}");
+        sb.Append("const useCtx=document.getElementById('sentinel-include-context').checked;");
+        sb.Append("const id=useCtx?'sentinel-payload-full':'sentinel-payload-sanitized';");
+        sb.Append("const payload=JSON.parse(document.getElementById(id).textContent);");
+        sb.Append("payload.contactEmail=email;");
+        sb.Append("const btn=form.querySelector('button');btn.disabled=true;out.className='pending';out.textContent='Sending…';");
+        sb.Append("try{");
+        sb.Append("const r=await fetch(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});");
+        sb.Append("const b=await r.json().catch(()=>({}));");
+        sb.Append("if(r.ok){out.className='ok';out.innerHTML='&#x2713; '+(b.message||'Report received.')+(b.id?' <span class=\"mono\">Ref: '+b.id+'</span>':'');form.style.display='none';}");
+        sb.Append("else{out.className='err';out.textContent='Error: '+(b.error||r.statusText||('HTTP '+r.status));btn.disabled=false;}");
+        sb.Append("}catch(err){out.className='err';out.textContent='Network error: '+err.message;btn.disabled=false;}");
+        sb.Append("});})();</script>");
+    }
+
     private static void RenderFooter(StringBuilder sb)
     {
         sb.Append("<footer>");
-        sb.Append("<p class=\"cta\">Want these fixed? Run <code>sentinel quote</code> to request a ");
-        sb.Append("fixed-price remediation estimate from <a href=\"https://refinedelement.com\">Refined Element</a> ");
-        sb.Append("— Kentico Community Leaders 2025 &amp; 2026.</p>");
+        sb.Append("<p class=\"cta\">Prefer the CLI? Run <code>sentinel quote</code> to submit from the terminal. ");
+        sb.Append("<a href=\"https://refinedelement.com\">Refined Element</a> — Kentico Community Leaders 2025 &amp; 2026.</p>");
         sb.Append("<p class=\"fine\">Report generated by Kentico Sentinel · MIT licensed · ");
         sb.Append("<a href=\"https://github.com/refined-element/kentico-sentinel\">github.com/refined-element/kentico-sentinel</a></p>");
         sb.Append("</footer>");
@@ -214,5 +299,22 @@ public static class HtmlReportWriter
         footer code { background: var(--panel); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--panel-border); }
         footer .fine { margin-top: 10px; font-size: 12px; }
         .empty { color: var(--ok); background: rgba(63,185,80,0.08); border: 1px solid rgba(63,185,80,0.25); padding: 16px; border-radius: 8px; }
+
+        .submit { background: var(--panel); border: 1px solid var(--panel-border); border-radius: 10px; padding: 22px 24px; margin-top: 36px; }
+        .submit h2 { margin-top: 0; }
+        .submit .intro { color: var(--muted); margin: 0 0 16px; font-size: 14px; }
+        .submit form { display: grid; gap: 12px; max-width: 520px; }
+        .submit label { font-size: 13px; color: var(--muted); font-weight: 600; }
+        .submit label.check { font-weight: 400; display: flex; gap: 8px; align-items: flex-start; line-height: 1.4; }
+        .submit label.check input { margin-top: 3px; flex-shrink: 0; }
+        .submit input[type=email] { padding: 10px 14px; font-size: 14px; background: var(--bg); color: var(--text); border: 1px solid var(--panel-border); border-radius: 6px; font-family: inherit; }
+        .submit input[type=email]:focus { border-color: var(--accent-2); outline: none; }
+        .submit button { padding: 10px 18px; font-size: 14px; font-weight: 600; background: var(--accent-2); color: var(--bg); border: 0; border-radius: 6px; cursor: pointer; transition: background 0.15s; }
+        .submit button:hover:not(:disabled) { background: #67e8f9; }
+        .submit button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #sentinel-result { margin-top: 14px; padding: 12px 14px; border-radius: 6px; font-size: 14px; display: none; }
+        #sentinel-result.pending { display: block; background: rgba(139,148,158,0.12); color: var(--muted); }
+        #sentinel-result.ok { display: block; background: rgba(63,185,80,0.12); color: var(--ok); border: 1px solid rgba(63,185,80,0.3); }
+        #sentinel-result.err { display: block; background: rgba(248,81,73,0.12); color: var(--error); border: 1px solid rgba(248,81,73,0.3); }
         """;
 }

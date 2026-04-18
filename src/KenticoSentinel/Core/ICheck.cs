@@ -19,6 +19,13 @@ public interface ICheck
     CheckKind Kind { get; }
 
     /// <summary>
+    /// True when findings from this check should be included in a `sentinel quote` submission.
+    /// Informational-only checks (e.g. "your Stripe.net is one minor behind") set this to false:
+    /// the finding still surfaces in the report, but it's not billed work for Refined Element to quote on.
+    /// </summary>
+    bool QuoteEligible => true;
+
+    /// <summary>
     /// Execute the check. Must not throw for expected failure modes — encode them as findings.
     /// Unexpected exceptions are caught by the runner and reported as a CheckFailed finding.
     /// </summary>

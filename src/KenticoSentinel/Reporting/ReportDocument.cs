@@ -38,7 +38,8 @@ public sealed record ReportFinding(
     string Severity,
     string Message,
     string? Location,
-    string? Remediation);
+    string? Remediation,
+    bool QuoteEligible);
 
 public static class ReportBuilder
 {
@@ -66,6 +67,6 @@ public static class ReportBuilder
         Findings: result.Findings
             .Select(f => new ReportFinding(
                 f.RuleId, f.RuleTitle, f.Category, f.Severity.ToString(),
-                f.Message, f.Location, f.Remediation))
+                f.Message, f.Location, f.Remediation, f.QuoteEligible))
             .ToArray());
 }

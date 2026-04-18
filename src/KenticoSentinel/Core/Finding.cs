@@ -17,4 +17,5 @@ public sealed record Finding(
     Severity Severity,
     string Message,
     string? Location = null,
-    string? Remediation = null);
+    string? Remediation = null,
+    bool QuoteEligible = true);

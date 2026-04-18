@@ -15,6 +15,10 @@ public sealed class OutdatedPackagesCheck : ICheck
     public string Category => "Dependencies";
     public CheckKind Kind => CheckKind.Static;
 
+    // NuGet patch/minor drift is informational — "update Stripe.net" isn't work Refined Element quotes on.
+    // Kentico platform version bumps live in VER001, which stays QuoteEligible.
+    public bool QuoteEligible => false;
+
     public async Task<IReadOnlyList<Finding>> RunAsync(ScanContext context, CancellationToken cancellationToken)
     {
         var findings = new List<Finding>();

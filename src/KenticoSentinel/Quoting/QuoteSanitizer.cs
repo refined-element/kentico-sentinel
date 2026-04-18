@@ -12,7 +12,11 @@ public static class QuoteSanitizer
 {
     public static QuoteSubmission Sanitize(ReportDocument report, string contactEmail, bool includeContext)
     {
-        var findings = report.Findings
+        // Drop findings the producing check marked as informational-only — they show up in the
+        // report (useful context) but the submitter isn't asking Refined Element to quote on them.
+        var eligible = report.Findings.Where(f => f.QuoteEligible).ToArray();
+
+        var findings = eligible
             .Select(f => new QuoteFinding(
                 RuleId: f.RuleId,
                 RuleTitle: f.RuleTitle,
@@ -23,11 +27,17 @@ public static class QuoteSanitizer
                 Remediation: includeContext ? f.Remediation : null))
             .ToArray();
 
+        var summary = new ReportSummary(
+            Total: eligible.Length,
+            Errors: eligible.Count(f => f.Severity == "Error"),
+            Warnings: eligible.Count(f => f.Severity == "Warning"),
+            Info: eligible.Count(f => f.Severity == "Info"));
+
         return new QuoteSubmission(
             ContactEmail: contactEmail,
             SentinelVersion: report.SentinelVersion,
             Scan: report.Scan with { RepoPath = includeContext ? report.Scan.RepoPath : "(redacted)" },
-            Summary: report.Summary,
+            Summary: summary,
             Findings: findings,
             IncludesContext: includeContext);
     }
