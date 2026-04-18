@@ -17,6 +17,7 @@ coverage/
 
 ## Tool output
 sentinel-report/
+reports/
 *.nupkg
 *.snupkg
 
