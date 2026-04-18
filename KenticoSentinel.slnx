@@ -1,0 +1,8 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/KenticoSentinel/KenticoSentinel.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/KenticoSentinel.Tests/KenticoSentinel.Tests.csproj" />
+  </Folder>
+</Solution>

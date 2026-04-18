@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>RefinedElement.Kentico.Sentinel</RootNamespace>
+    <AssemblyName>sentinel</AssemblyName>
+
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>sentinel</ToolCommandName>
+    <PackageId>RefinedElement.Kentico.Sentinel</PackageId>
+    <Version>0.1.0-alpha</Version>
+    <Authors>Refined Element</Authors>
+    <Company>Refined Element</Company>
+    <Description>Static + runtime health scanner for Xperience by Kentico projects. ESLint for Kentico.</Description>
+    <PackageTags>kentico;xperience-by-kentico;linter;scanner;health-check</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/refined-element/kentico-sentinel</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/refined-element/kentico-sentinel</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.6" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.6" />
+    <PackageReference Include="NuGet.Protocol" Version="7.3.1" />
+    <PackageReference Include="Semver" Version="3.0.0" />
+    <PackageReference Include="Spectre.Console.Cli" Version="0.55.0" />
+  </ItemGroup>
+
+</Project>

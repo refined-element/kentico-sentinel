@@ -1,0 +1,36 @@
+## .NET build output
+bin/
+obj/
+out/
+artifacts/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+
+## Test results
+TestResults/
+coverage/
+*.coverage
+*.coveragexml
+
+## Tool output
+sentinel-report/
+*.nupkg
+*.snupkg
+
+## OS / editor detritus
+.DS_Store
+Thumbs.db
+*.swp
+
+## Local config and secrets
+.env
+.env.*
+appsettings.Development.json
+appsettings.Local.json
+secrets.json
+
+## Claude / agent state
+.claude/settings.local.json

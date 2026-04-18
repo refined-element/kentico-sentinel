@@ -1,0 +1,135 @@
+using System.ComponentModel;
+using RefinedElement.Kentico.Sentinel.Core;
+using RefinedElement.Kentico.Sentinel.Infrastructure;
+using RefinedElement.Kentico.Sentinel.Reporting;
+using Spectre.Console;
+using Spectre.Console.Cli;
+
+namespace RefinedElement.Kentico.Sentinel.Commands;
+
+public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
+{
+    public sealed class Settings : CommandSettings
+    {
+        [Description("Path to the Xperience by Kentico project root (folder containing the .csproj).")]
+        [CommandOption("-p|--path")]
+        public string Path { get; init; } = ".";
+
+        [Description("SQL Server connection string for runtime content checks. If omitted, only static code checks run.")]
+        [CommandOption("-c|--connection-string")]
+        public string? ConnectionString { get; init; }
+
+        [Description("Directory to write the HTML and JSON reports. Defaults to ./sentinel-report.")]
+        [CommandOption("-o|--output")]
+        public string OutputDirectory { get; init; } = "./sentinel-report";
+
+        [Description("Stale content threshold in days. Items not edited in this window are flagged.")]
+        [CommandOption("--stale-days")]
+        public int StaleDays { get; init; } = 180;
+
+        [Description("Fail the process with a non-zero exit code if any finding has severity >= this threshold. One of: info, warning, error.")]
+        [CommandOption("--fail-on")]
+        public string FailOn { get; init; } = "error";
+    }
+
+    protected override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
+    {
+        var repoPath = System.IO.Path.GetFullPath(settings.Path);
+        if (!Directory.Exists(repoPath))
+        {
+            AnsiConsole.MarkupLine($"[red]Path not found:[/] {repoPath}");
+            return 2;
+        }
+
+        if (!Enum.TryParse<Severity>(settings.FailOn, ignoreCase: true, out var failOn))
+        {
+            AnsiConsole.MarkupLine($"[red]Invalid --fail-on value '{settings.FailOn}'. Use info, warning, or error.[/]");
+            return 2;
+        }
+
+        using var httpFactory = new SingleHttpClientFactory();
+        var scanContext = new ScanContext
+        {
+            RepoPath = repoPath,
+            ConnectionString = settings.ConnectionString,
+            StaleDays = settings.StaleDays,
+            HttpClientFactory = httpFactory,
+        };
+
+        var runner = new CheckRunner(CheckRegistry.BuiltIn());
+
+        ScanResult result = null!;
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .StartAsync("Scanning...", async ctx =>
+            {
+                var progress = new Progress<CheckProgress>(p =>
+                {
+                    ctx.Status($"[grey]({p.Index}/{p.Total})[/] {p.Check.RuleId} — {p.Check.Title}");
+                });
+                result = await runner.RunAsync(scanContext, progress, cancellationToken).ConfigureAwait(false);
+            })
+            .ConfigureAwait(false);
+
+        PrintSummary(result);
+
+        var reportDoc = ReportBuilder.Build(result);
+        var outputDir = System.IO.Path.GetFullPath(settings.OutputDirectory);
+        var jsonPath = System.IO.Path.Combine(outputDir, "report.json");
+        var htmlPath = System.IO.Path.Combine(outputDir, "report.html");
+
+        await JsonReportWriter.WriteAsync(reportDoc, jsonPath, cancellationToken).ConfigureAwait(false);
+        await HtmlReportWriter.WriteAsync(reportDoc, htmlPath, cancellationToken).ConfigureAwait(false);
+
+        AnsiConsole.MarkupLine($"\n[green]✓[/] Reports written to [cyan]{outputDir}[/]");
+        AnsiConsole.MarkupLine($"  [dim]{jsonPath}[/]");
+        AnsiConsole.MarkupLine($"  [dim]{htmlPath}[/]");
+
+        return result.MaxSeverity() >= failOn && result.Findings.Count > 0 ? 1 : 0;
+    }
+
+    private static void PrintSummary(ScanResult result)
+    {
+        AnsiConsole.WriteLine();
+        var table = new Table().Border(TableBorder.Rounded).AddColumn("Metric").AddColumn("Value");
+        table.AddRow("Repo", result.RepoPath);
+        table.AddRow("Runtime checks", result.RuntimeEnabled ? "[green]enabled[/]" : "[yellow]skipped (no connection string)[/]");
+        table.AddRow("Duration", $"{result.Duration.TotalSeconds:N2}s");
+        table.AddRow("Checks executed", result.Executions.Count(e => e.Status == CheckExecutionStatus.Ran).ToString());
+        table.AddRow("Checks skipped (runtime)", result.Executions.Count(e => e.Status == CheckExecutionStatus.SkippedRuntime).ToString());
+        table.AddRow("Checks failed", result.Executions.Count(e => e.Status == CheckExecutionStatus.Failed).ToString());
+        table.AddRow("[red]Errors[/]", result.ErrorCount.ToString());
+        table.AddRow("[yellow]Warnings[/]", result.WarningCount.ToString());
+        table.AddRow("[grey]Info[/]", result.InfoCount.ToString());
+        AnsiConsole.Write(table);
+
+        if (result.Findings.Count == 0)
+        {
+            AnsiConsole.MarkupLine("\n[green]No issues found.[/]");
+            return;
+        }
+
+        var findings = new Table()
+            .Border(TableBorder.Minimal)
+            .AddColumn("Severity")
+            .AddColumn("Rule")
+            .AddColumn("Finding");
+
+        foreach (var f in result.Findings.OrderByDescending(x => x.Severity).ThenBy(x => x.RuleId))
+        {
+            var color = f.Severity switch
+            {
+                Severity.Error => "red",
+                Severity.Warning => "yellow",
+                _ => "grey",
+            };
+            findings.AddRow(
+                $"[{color}]{f.Severity.ToString().ToUpperInvariant()}[/]",
+                f.RuleId,
+                Markup.Escape(f.Message));
+        }
+        AnsiConsole.Write(findings);
+
+        AnsiConsole.MarkupLine("\n[dim]Fix these automatically — run `sentinel quote` to request a remediation estimate from Refined Element.[/]");
+    }
+}
