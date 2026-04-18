@@ -14,6 +14,9 @@ public sealed record ScanContext
     /// <summary>Stale-content threshold in days. Items not edited in this window are flagged by CNT003.</summary>
     public int StaleDays { get; init; } = 180;
 
+    /// <summary>EventLog lookback window in days. CNT006 groups errors/warnings from CMS_EventLog within this period.</summary>
+    public int EventLogDays { get; init; } = 30;
+
     /// <summary>HTTP client factory for checks that reach out to external services (NuGet feed, Kentico release feed).</summary>
     public required IHttpClientFactory HttpClientFactory { get; init; }
 

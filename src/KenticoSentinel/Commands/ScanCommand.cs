@@ -41,6 +41,10 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
         [CommandOption("--stale-days")]
         public int StaleDays { get; init; } = 180;
 
+        [Description("EventLog lookback window in days. Errors and warnings from CMS_EventLog are grouped within this period (CNT006).")]
+        [CommandOption("--event-log-days")]
+        public int EventLogDays { get; init; } = 30;
+
         [Description("Fail the process with a non-zero exit code if any finding has severity >= this threshold. One of: info, warning, error.")]
         [CommandOption("--fail-on")]
         public string FailOn { get; init; } = "error";
@@ -99,6 +103,7 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
             RepoPath = repoPath,
             ConnectionString = settings.ConnectionString,
             StaleDays = settings.StaleDays,
+            EventLogDays = settings.EventLogDays,
             HttpClientFactory = httpFactory,
         };
 

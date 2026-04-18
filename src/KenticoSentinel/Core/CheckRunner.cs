@@ -46,11 +46,12 @@ public sealed class CheckRunner
             {
                 var checkFindings = await check.RunAsync(context, cancellationToken).ConfigureAwait(false);
                 sw.Stop();
-                // Stamp each finding with the check's quote eligibility so the sanitizer doesn't need
-                // to re-resolve the check later.
+                // Stamp each finding with the AND of check-level and finding-level eligibility so the
+                // sanitizer doesn't need to re-resolve the check later. A check can declare itself
+                // info-only (DEP001) AND individual findings can opt out (CNT006 low-count warnings).
                 foreach (var f in checkFindings)
                 {
-                    findings.Add(f with { QuoteEligible = check.QuoteEligible });
+                    findings.Add(f with { QuoteEligible = f.QuoteEligible && check.QuoteEligible });
                 }
                 executions.Add(new CheckExecution(
                     check.RuleId,

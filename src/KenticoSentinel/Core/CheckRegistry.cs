@@ -23,5 +23,6 @@ public static class CheckRegistry
         new StaleContentCheck(),             // CNT003
         new OrphanedMediaCheck(),            // CNT004
         new MalformedWidgetsCheck(),         // CNT005
+        new EventLogCheck(),                 // CNT006
     ];
 }
