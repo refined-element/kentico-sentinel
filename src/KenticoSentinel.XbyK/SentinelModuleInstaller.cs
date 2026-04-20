@@ -136,8 +136,14 @@ public class SentinelModuleInstaller(IInfoProvider<ResourceInfo> resourceProvide
         AllowEmpty = allowEmpty,
         Visible = true,
         Enabled = true,
-        Precision = precision,
-        Size = scale,
+        // Kentico's FormFieldInfo -> SQL DDL mapping for decimals is counterintuitive:
+        //   FormFieldInfo.Size      -> SQL precision (total digit count)
+        //   FormFieldInfo.Precision -> SQL scale     (digits after decimal)
+        // Previously swapped, which produced ALTER TABLE … decimal(3,10) and SQL rejected
+        // the install transaction ("scale must be within 0..precision"). No tables got
+        // created on v0.2.0 / v0.2.1 despite the module loading.
+        Size = precision,
+        Precision = scale,
     };
 
     private static FormFieldInfo TextField(string name, string dataType, int size = 0, bool allowEmpty = false) => new()
