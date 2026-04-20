@@ -37,7 +37,10 @@ jobs:
       - name: Test
         run: dotnet test KenticoSentinel.slnx --configuration Release --no-build --verbosity minimal
 
-      - name: Pack
+      - name: Pack Core library
+        run: dotnet pack src/KenticoSentinel.Core/KenticoSentinel.Core.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
+
+      - name: Pack CLI tool
         run: dotnet pack src/KenticoSentinel/KenticoSentinel.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
 
       - name: Push to NuGet

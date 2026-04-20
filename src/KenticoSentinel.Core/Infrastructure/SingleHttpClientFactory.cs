@@ -1,10 +1,12 @@
 namespace RefinedElement.Kentico.Sentinel.Infrastructure;
 
 /// <summary>
-/// Minimal <see cref="IHttpClientFactory"/> for a CLI process. One shared <see cref="HttpClient"/> for the
-/// entire run — we don't need connection rotation or named clients for a single-invocation tool.
+/// Minimal <see cref="IHttpClientFactory"/> for short-lived hosts (CLI, tests, one-shot scans).
+/// One shared <see cref="HttpClient"/> for the lifetime of the factory — no connection rotation
+/// or named-client routing needed. XbyK embedded mode should use the real DI-registered factory
+/// from <c>AddHttpClient()</c> instead of this one.
 /// </summary>
-internal sealed class SingleHttpClientFactory : IHttpClientFactory, IDisposable
+public sealed class SingleHttpClientFactory : IHttpClientFactory, IDisposable
 {
     private readonly HttpClient _client;
 
