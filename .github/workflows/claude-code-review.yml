@@ -25,6 +25,7 @@ jobs:
       pull-requests: read
       issues: read
       id-token: write
+      actions: read  # parity with claude.yml — review needs to see CI/check results on the PR
 
     steps:
       - name: Checkout repository

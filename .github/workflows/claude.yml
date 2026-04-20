@@ -6,7 +6,10 @@ on:
   pull_request_review_comment:
     types: [created]
   issues:
-    types: [opened, assigned]
+    # Only fire on `opened`. `assigned` would re-run every time someone reassigns an issue whose
+    # body still contains @claude, racking up billable runs for no new trigger. Users who want to
+    # ping Claude on an existing issue leave a comment (covered by issue_comment/created above).
+    types: [opened]
   pull_request_review:
     types: [submitted]
 
