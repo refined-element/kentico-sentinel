@@ -37,6 +37,12 @@ public sealed class SentinelScanTask : IScheduledTask
         try
         {
             var run = await scanService.RunAsync(trigger: "Scheduled", cancellationToken).ConfigureAwait(false);
+            if (run is null)
+            {
+                // Sentinel:Enabled is false in config.
+                return new ScheduledTaskExecutionResult("Sentinel scan skipped: integration is disabled in configuration.");
+            }
+
             logger.LogInformation("Sentinel scheduled scan completed: run #{RunId}, {Total} findings.",
                 run.SentinelScanRunID, run.SentinelScanRunTotalFindings);
             // Successful runs return the singleton; the admin UI shows "Succeeded" without a message.
@@ -49,8 +55,11 @@ public sealed class SentinelScanTask : IScheduledTask
         }
         catch (Exception ex)
         {
+            // Log the exception with full detail internally, but return a generic message so that
+            // connection strings, server names, paths, etc. don't leak to admins who might only
+            // glance at the Scheduled Tasks UI.
             logger.LogError(ex, "Sentinel scheduled scan failed.");
-            return new ScheduledTaskExecutionResult($"Sentinel scan failed: {ex.Message}");
+            return new ScheduledTaskExecutionResult("Sentinel scan failed. Check the Event log / application logs for details.");
         }
     }
 }

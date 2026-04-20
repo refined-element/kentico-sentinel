@@ -50,8 +50,12 @@ public static class SentinelServiceCollectionExtensions
     {
         services.AddHttpClient();
 
-        // Module installer is resolved in the RegisterModule callback, not by DI-constructor injection.
-        services.AddScoped<SentinelModuleInstaller>();
+        // Installer lifetime: Singleton. Kentico resolves it once during startup from the root
+        // provider (inside SentinelModule.OnInit) and keeps the reference for the full app
+        // lifetime, so the service registration must not be scoped — otherwise scope validation
+        // throws, or (without validation) we quietly leak a scoped instance.
+        services.AddSingleton<SentinelModuleInstaller>();
+
         services.AddScoped<SentinelScanService>();
         services.AddScoped<ISentinelEventLogWriter, SentinelEventLogWriter>();
         services.AddScoped<ISentinelEmailDigestSender, SentinelEmailDigestSender>();

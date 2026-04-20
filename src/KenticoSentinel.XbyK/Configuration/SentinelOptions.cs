@@ -9,24 +9,22 @@ public sealed class SentinelOptions
 {
     public const string SectionName = "Sentinel";
 
+    /// <summary>
+    /// Master kill-switch. Set to <c>false</c> to suspend all scan execution without removing the
+    /// package. Honored by <see cref="Services.SentinelScanService"/> — a disabled scan returns
+    /// early and the scheduled task reports "Skipped (disabled)" to the admin.
+    /// </summary>
     public bool Enabled { get; set; } = true;
-    public ScheduleOptions Schedule { get; set; } = new();
+
     public ChecksOptions Checks { get; set; } = new();
     public RuntimeCheckOptions RuntimeChecks { get; set; } = new();
     public EmailDigestOptions EmailDigest { get; set; } = new();
     public EventLogOptions EventLogIntegration { get; set; } = new();
     public ContactOptions ContactRefinedElement { get; set; } = new();
 
-    public sealed class ScheduleOptions
-    {
-        /// <summary>
-        /// 6-field cron (with seconds). Default "0 0 9 * * MON" = 9am every Monday UTC.
-        /// Parsed by Cronos; invalid expressions fail fast at startup.
-        /// </summary>
-        public string CronExpression { get; set; } = "0 0 9 * * MON";
-        public bool RunOnStartup { get; set; } = true;
-        public int InitialDelayMinutes { get; set; } = 5;
-    }
+    // The run cadence lives in Kentico's Scheduled Tasks app (kentico-admin/applications/
+    // scheduled-tasks) once the module installer has registered the task row. No custom cron
+    // option here — admins edit the interval in-situ with the Kentico UI they already know.
 
     public sealed class ChecksOptions
     {
@@ -47,8 +45,12 @@ public sealed class SentinelOptions
         public bool Enabled { get; set; } = true;
         public List<string> Recipients { get; set; } = [];
 
-        /// <summary>Skip digest when the scan produced nothing new vs. the last one.</summary>
-        public bool OnlyWhenNewFindings { get; set; } = true;
+        /// <summary>
+        /// Skip the digest when no findings in the current scan meet <see cref="SeverityThreshold"/>.
+        /// Does NOT compare against the previous scan; a proper "only when new" mode driven by
+        /// fingerprint diff is on the roadmap (see plan doc).
+        /// </summary>
+        public bool OnlyWhenThresholdFindings { get; set; } = true;
 
         /// <summary>"Error" | "Warning" | "Info" — findings below this don't trigger the digest.</summary>
         public string SeverityThreshold { get; set; } = "Warning";

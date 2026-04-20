@@ -27,7 +27,7 @@ internal sealed class SentinelEmailDigestSender(
         }
 
         var digestWorthy = findings.Where(f => f.Severity >= threshold).ToArray();
-        if (options.EmailDigest.OnlyWhenNewFindings && digestWorthy.Length == 0)
+        if (options.EmailDigest.OnlyWhenThresholdFindings && digestWorthy.Length == 0)
         {
             logger.LogInformation("Sentinel digest suppressed — no findings at or above {Threshold} severity.", threshold);
             return;
@@ -68,7 +68,8 @@ internal sealed class SentinelEmailDigestSender(
         sb.Append("<!DOCTYPE html><html><body style=\"font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#1a1a2e;background:#f5f5f7;margin:0;padding:32px 0;\">");
         sb.Append("<div style=\"max-width:600px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;\">");
 
-        sb.Append("<h2 style=\"color:#1a1a2e;margin:0 0 12px;\">Kentico Sentinel weekly digest</h2>");
+        // Schedule is owned by Kentico's Scheduled Tasks app — cadence may not be weekly.
+        sb.Append("<h2 style=\"color:#1a1a2e;margin:0 0 12px;\">Kentico Sentinel scan digest</h2>");
         sb.Append($"<p style=\"color:#555;margin:0 0 24px;font-size:14px;\">Scan #{run.SentinelScanRunID} completed {run.SentinelScanRunCompletedAt:yyyy-MM-dd HH:mm} UTC.</p>");
 
         sb.Append("<table cellspacing=\"0\" cellpadding=\"0\" style=\"width:100%;border-collapse:collapse;margin:0 0 24px;\">");
@@ -103,9 +104,11 @@ internal sealed class SentinelEmailDigestSender(
 
     private static void AppendRow(StringBuilder sb, string label, string value, string? color = null)
     {
+        // Encode both cells — label is always a literal in our code today, but value can be a
+        // user-supplied Trigger string and future rows may inline anything.
         sb.Append("<tr>");
-        sb.Append($"<td style=\"padding:6px 0;color:#8b8b95;width:140px;font-size:13px;\">{label}</td>");
-        sb.Append($"<td style=\"padding:6px 0;color:{color ?? "#1a1a2e"};font-weight:600;\">{value}</td>");
+        sb.Append($"<td style=\"padding:6px 0;color:#8b8b95;width:140px;font-size:13px;\">{HtmlEncode(label)}</td>");
+        sb.Append($"<td style=\"padding:6px 0;color:{color ?? "#1a1a2e"};font-weight:600;\">{HtmlEncode(value)}</td>");
         sb.Append("</tr>");
     }
 

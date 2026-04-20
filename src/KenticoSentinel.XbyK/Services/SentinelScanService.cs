@@ -1,4 +1,5 @@
 using CMS.DataEngine;
+using CMS.Helpers;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -26,8 +27,14 @@ public sealed class SentinelScanService(
 {
     private readonly SentinelOptions options = options.Value;
 
-    public async Task<SentinelScanRunInfo> RunAsync(string trigger, CancellationToken cancellationToken = default)
+    public async Task<SentinelScanRunInfo?> RunAsync(string trigger, CancellationToken cancellationToken = default)
     {
+        if (!options.Enabled)
+        {
+            logger.LogInformation("Sentinel scan skipped: Sentinel:Enabled is false. Trigger={Trigger}.", trigger);
+            return null;
+        }
+
         var runRow = new SentinelScanRunInfo
         {
             SentinelScanRunGuid = Guid.NewGuid(),
@@ -52,33 +59,41 @@ public sealed class SentinelScanService(
 
             var result = await runner.RunAsync(context, progress: null, cancellationToken).ConfigureAwait(false);
 
-            // Persist findings first, then update the scan-run row with aggregate counts + status.
-            foreach (var f in result.Findings)
+            // Keep the findings inserts + scan-run update atomic. If one finding row fails mid-loop
+            // we don't want the scan-run row to say "Completed: 14 findings" while only 9 actually
+            // landed. CMSTransactionScope wraps Kentico's Info provider writes in a single DB
+            // transaction and commits only on success.
+            using (var tx = new CMSTransactionScope())
             {
-                findingProvider.Set(new SentinelFindingInfo
+                foreach (var f in result.Findings)
                 {
-                    SentinelFindingGuid = Guid.NewGuid(),
-                    SentinelFindingScanRunID = runRow.SentinelScanRunID,
-                    SentinelFindingRuleID = f.RuleId,
-                    SentinelFindingRuleTitle = f.RuleTitle,
-                    SentinelFindingCategory = f.Category,
-                    SentinelFindingSeverity = f.Severity.ToString(),
-                    SentinelFindingMessage = f.Message,
-                    SentinelFindingLocation = f.Location ?? string.Empty,
-                    SentinelFindingRemediation = f.Remediation ?? string.Empty,
-                    SentinelFindingQuoteEligible = f.QuoteEligible,
-                    SentinelFindingFingerprintHash = FindingFingerprint.Compute(f),
-                });
-            }
+                    findingProvider.Set(new SentinelFindingInfo
+                    {
+                        SentinelFindingGuid = Guid.NewGuid(),
+                        SentinelFindingScanRunID = runRow.SentinelScanRunID,
+                        SentinelFindingRuleID = f.RuleId,
+                        SentinelFindingRuleTitle = f.RuleTitle,
+                        SentinelFindingCategory = f.Category,
+                        SentinelFindingSeverity = f.Severity.ToString(),
+                        SentinelFindingMessage = f.Message,
+                        SentinelFindingLocation = f.Location ?? string.Empty,
+                        SentinelFindingRemediation = f.Remediation ?? string.Empty,
+                        SentinelFindingQuoteEligible = f.QuoteEligible,
+                        SentinelFindingFingerprintHash = FindingFingerprint.Compute(f),
+                    });
+                }
 
-            runRow.SentinelScanRunCompletedAt = DateTime.UtcNow;
-            runRow.SentinelScanRunTotalFindings = result.Findings.Count;
-            runRow.SentinelScanRunErrorCount = result.ErrorCount;
-            runRow.SentinelScanRunWarningCount = result.WarningCount;
-            runRow.SentinelScanRunInfoCount = result.InfoCount;
-            runRow.SentinelScanRunDurationSeconds = (decimal)result.Duration.TotalSeconds;
-            runRow.SentinelScanRunStatus = "Completed";
-            scanRunProvider.Set(runRow);
+                runRow.SentinelScanRunCompletedAt = DateTime.UtcNow;
+                runRow.SentinelScanRunTotalFindings = result.Findings.Count;
+                runRow.SentinelScanRunErrorCount = result.ErrorCount;
+                runRow.SentinelScanRunWarningCount = result.WarningCount;
+                runRow.SentinelScanRunInfoCount = result.InfoCount;
+                runRow.SentinelScanRunDurationSeconds = (decimal)result.Duration.TotalSeconds;
+                runRow.SentinelScanRunStatus = "Completed";
+                scanRunProvider.Set(runRow);
+
+                tx.Commit();
+            }
 
             logger.LogInformation("Sentinel scan completed: run={RunId}, findings={Total} ({Errors}E/{Warnings}W/{Info}I).",
                 runRow.SentinelScanRunID, result.Findings.Count, result.ErrorCount, result.WarningCount, result.InfoCount);
