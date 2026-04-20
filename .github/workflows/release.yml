@@ -40,6 +40,9 @@ jobs:
       - name: Pack Core library
         run: dotnet pack src/KenticoSentinel.Core/KenticoSentinel.Core.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
 
+      - name: Pack XbyK integration
+        run: dotnet pack src/KenticoSentinel.XbyK/KenticoSentinel.XbyK.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
+
       - name: Pack CLI tool
         run: dotnet pack src/KenticoSentinel/KenticoSentinel.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
 
