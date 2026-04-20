@@ -10,7 +10,7 @@ namespace KenticoSentinel.Tests.XbyK;
 public class FindingFingerprintTests
 {
     private static Finding Sample(string message = "Content type 'LandingPage' has zero content items.",
-                                  string location = "CMS_Class.ClassName=ReXBK.LandingPage") =>
+                                  string? location = "CMS_Class.ClassName=ReXBK.LandingPage") =>
         new(RuleId: "CNT001",
             RuleTitle: "Unused content types",
             Category: "Content Model",
@@ -69,7 +69,7 @@ public class FindingFingerprintTests
     [Fact]
     public void Null_or_empty_location_hashes_consistently()
     {
-        var withNull = Sample(location: null!);
+        var withNull = Sample(location: null);
         var withEmpty = Sample(location: "");
         Assert.Equal(FindingFingerprint.Compute(withNull), FindingFingerprint.Compute(withEmpty));
     }

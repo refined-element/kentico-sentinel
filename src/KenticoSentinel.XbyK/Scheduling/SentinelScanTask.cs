@@ -34,8 +34,19 @@ public sealed class SentinelScanTask : IScheduledTask
         }
 
         using var scope = services.CreateScope();
-        var scanService = scope.ServiceProvider.GetRequiredService<SentinelScanService>();
-        var logger = scope.ServiceProvider.GetRequiredService<ILogger<SentinelScanTask>>();
+
+        // Optional resolution — same reasoning as SentinelModule.OnInit. If a consumer installed
+        // the package but forgot `builder.Services.AddKenticoSentinel(...)`, don't throw on every
+        // scheduler tick. Return a clean "not registered" message once; the admin sees it in the
+        // Scheduled Tasks list's Last-run column and knows exactly what's missing.
+        var scanService = scope.ServiceProvider.GetService<SentinelScanService>();
+        var logger = scope.ServiceProvider.GetService<ILogger<SentinelScanTask>>();
+
+        if (scanService is null)
+        {
+            return new ScheduledTaskExecutionResult(
+                "Sentinel services are not registered. Add `builder.Services.AddKenticoSentinel(builder.Configuration)` to Program.cs.");
+        }
 
         try
         {
@@ -46,7 +57,7 @@ public sealed class SentinelScanTask : IScheduledTask
                 return new ScheduledTaskExecutionResult("Sentinel scan skipped: integration is disabled in configuration.");
             }
 
-            logger.LogInformation("Sentinel scheduled scan completed: run #{RunId}, {Total} findings.",
+            logger?.LogInformation("Sentinel scheduled scan completed: run #{RunId}, {Total} findings.",
                 run.SentinelScanRunID, run.SentinelScanRunTotalFindings);
             // Successful runs return the singleton; the admin UI shows "Succeeded" without a message.
             // Detailed run summary is persisted on the RefinedElement_SentinelScanRun row (+ related
@@ -63,7 +74,7 @@ public sealed class SentinelScanTask : IScheduledTask
             // Log the exception with full detail internally, but return a generic message so that
             // connection strings, server names, paths, etc. don't leak to admins who might only
             // glance at the Scheduled Tasks UI.
-            logger.LogError(ex, "Sentinel scheduled scan failed.");
+            logger?.LogError(ex, "Sentinel scheduled scan failed.");
             return new ScheduledTaskExecutionResult("Sentinel scan failed. Check the Event log / application logs for details.");
         }
     }

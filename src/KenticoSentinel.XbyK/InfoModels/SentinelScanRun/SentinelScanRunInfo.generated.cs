@@ -112,7 +112,7 @@ public partial class SentinelScanRunInfo : AbstractInfo<SentinelScanRunInfo, IIn
         set => SetValue(nameof(SentinelScanRunDurationSeconds), value);
     }
 
-    /// <summary>"Running" | "Completed" | "Failed".</summary>
+    /// <summary>"Running" | "Completed" | "Failed" | "Cancelled".</summary>
     [DatabaseField]
     public virtual string SentinelScanRunStatus
     {
