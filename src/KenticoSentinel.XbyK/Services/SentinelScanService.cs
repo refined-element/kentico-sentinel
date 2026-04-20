@@ -137,6 +137,20 @@ public sealed class SentinelScanService(
 
             return runRow;
         }
+        catch (OperationCanceledException)
+        {
+            // Cancellations are an expected outcome — someone hit "cancel" on the scheduled task,
+            // an app shutdown is propagating the token, etc. Don't pollute the error log with
+            // stack traces or mark the run "Failed"; record a first-class "Cancelled" status
+            // and rethrow so the scheduled task returns its own cancelled result.
+            runRow.SentinelScanRunCompletedAt = DateTime.UtcNow;
+            runRow.SentinelScanRunStatus = "Cancelled";
+            runRow.SentinelScanRunErrorMessage = "Scan cancelled before completion.";
+            scanRunProvider.Set(runRow);
+            logger.LogWarning("Sentinel scan cancelled for run {RunId} ({RunGuid}).",
+                runRow.SentinelScanRunID, runRow.SentinelScanRunGuid);
+            throw;
+        }
         catch (Exception ex)
         {
             runRow.SentinelScanRunCompletedAt = DateTime.UtcNow;
