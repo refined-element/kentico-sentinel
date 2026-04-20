@@ -10,7 +10,7 @@
     <AssemblyName>RefinedElement.Kentico.Sentinel.Core</AssemblyName>
 
     <PackageId>RefinedElement.Kentico.Sentinel.Core</PackageId>
-    <Version>0.2.0-alpha</Version>
+    <Version>0.2.1-alpha</Version>
     <Authors>Refined Element</Authors>
     <Company>Refined Element</Company>
     <Description>Reusable core library for Kentico Sentinel — checks, scan engine, reporting, and quoting. Target any host: CLI, ASP.NET Core background workers, Xperience by Kentico integration, GitHub Actions.</Description>

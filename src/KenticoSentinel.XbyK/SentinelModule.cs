@@ -5,6 +5,11 @@ using CMS.DataEngine;
 
 using Microsoft.Extensions.DependencyInjection;
 
+// Gate for Kentico's assembly scanner. Without this attribute, Kentico skips the DLL on startup
+// scan, so [RegisterScheduledTask] below never populates the "Task implementation" dropdown in
+// the admin Scheduled Tasks app — even though the module + installer paths still work via the
+// Module base class. Learned the hard way in v0.2.0-alpha on refinedelement.com.
+[assembly: AssemblyDiscoverable]
 [assembly: RegisterModule(typeof(RefinedElement.Kentico.Sentinel.XbyK.SentinelModule))]
 
 namespace RefinedElement.Kentico.Sentinel.XbyK;
