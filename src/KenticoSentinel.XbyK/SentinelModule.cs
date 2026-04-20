@@ -16,7 +16,8 @@ namespace RefinedElement.Kentico.Sentinel.XbyK;
 /// </summary>
 internal sealed class SentinelModule : Module
 {
-    private SentinelModuleInstaller installer = null!;
+    private SentinelModuleInstaller? installer;
+    private IEventLogService? eventLog;
 
     public SentinelModule() : base(nameof(SentinelModule)) { }
 
@@ -24,9 +25,38 @@ internal sealed class SentinelModule : Module
     {
         base.OnInit(parameters);
 
-        installer = parameters.Services.GetRequiredService<SentinelModuleInstaller>();
+        // Optional resolution: if a consumer installs the package but forgets
+        // `builder.Services.AddKenticoSentinel(...)` in Program.cs, don't crash startup. Degrade
+        // gracefully with a single event-log warning and leave the rest of Kentico alone.
+        installer = parameters.Services.GetService<SentinelModuleInstaller>();
+        eventLog = parameters.Services.GetService<IEventLogService>();
+
+        if (installer is null)
+        {
+            eventLog?.LogWarning(
+                source: "Sentinel",
+                eventCode: "MODULE_NOT_REGISTERED",
+                eventDescription:
+                    "Sentinel module discovered but SentinelModuleInstaller is not registered in DI. " +
+                    "Add `builder.Services.AddKenticoSentinel(builder.Configuration)` in Program.cs to enable Sentinel. " +
+                    "The rest of the application is unaffected.");
+            return;
+        }
+
         ApplicationEvents.Initialized.Execute += OnInitialized;
     }
 
-    private void OnInitialized(object? sender, EventArgs e) => installer.Install();
+    private void OnInitialized(object? sender, EventArgs e)
+    {
+        try
+        {
+            installer?.Install();
+        }
+        catch (Exception ex)
+        {
+            // Don't let installer failures cascade into app startup failures. Log loudly and
+            // continue — the site remains available; Sentinel just won't scan this run.
+            eventLog?.LogException("Sentinel", "INSTALL_FAILED", ex);
+        }
+    }
 }

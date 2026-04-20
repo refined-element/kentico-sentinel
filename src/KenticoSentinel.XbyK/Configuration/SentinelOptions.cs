@@ -61,6 +61,14 @@ public sealed class SentinelOptions
     {
         public bool Enabled { get; set; } = true;
         public string SeverityThreshold { get; set; } = "Warning";
+
+        /// <summary>
+        /// Maximum number of per-finding entries written to <c>CMS_EventLog</c> in a single scan.
+        /// A 1000-finding scan would otherwise balloon the event log and slow the admin app that
+        /// pages over it. When exceeded, the writer emits one "N more suppressed" summary instead
+        /// of the remaining entries. The per-scan summary entry is always written regardless.
+        /// </summary>
+        public int MaxEntriesPerScan { get; set; } = 50;
     }
 
     // ContactRefinedElement config lands in the Phase 4 PR along with the actual contact flow.

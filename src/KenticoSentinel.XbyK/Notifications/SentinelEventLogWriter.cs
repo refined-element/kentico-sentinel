@@ -31,8 +31,14 @@ internal sealed class SentinelEventLogWriter(IEventLogService eventLog, IOptions
             threshold = Severity.Warning;
         }
 
-        // One event per severity-qualifying finding.
-        foreach (var f in findings.Where(f => f.Severity >= threshold))
+        var qualifying = findings.Where(f => f.Severity >= threshold).ToArray();
+        var cap = Math.Max(0, options.EventLogIntegration.MaxEntriesPerScan);
+        var toWrite = qualifying.Take(cap);
+        var suppressed = Math.Max(0, qualifying.Length - cap);
+
+        // One event per severity-qualifying finding, capped by MaxEntriesPerScan so a single
+        // thousand-finding scan can't balloon the event log / slow the admin's Event log pager.
+        foreach (var f in toWrite)
         {
             var desc = string.IsNullOrWhiteSpace(f.Location)
                 ? $"{f.RuleId}: {f.Message}"
@@ -49,6 +55,19 @@ internal sealed class SentinelEventLogWriter(IEventLogService eventLog, IOptions
                     eventLog.LogInformation(EventSource, f.RuleId, desc);
                     break;
             }
+        }
+
+        if (suppressed > 0)
+        {
+            // Single summary line so the admin sees the scale of what was dropped without the
+            // noise of writing every remaining row.
+            eventLog.LogInformation(
+                source: EventSource,
+                eventCode: "FINDINGS_TRUNCATED",
+                eventDescription:
+                    $"Sentinel scan #{run.SentinelScanRunID} had {qualifying.Length} findings at or above " +
+                    $"{threshold} severity; {suppressed} not written to the event log (MaxEntriesPerScan={cap}). " +
+                    $"Full list is available in the Sentinel_Finding table.");
         }
     }
 }

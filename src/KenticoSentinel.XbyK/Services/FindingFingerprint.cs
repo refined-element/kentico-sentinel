@@ -25,8 +25,11 @@ internal static class FindingFingerprint
     private static string Normalize(string value) => value.Trim().ToLowerInvariant();
 
     /// <summary>
-    /// Replace standalone digit runs with a placeholder so "found 14 unused content types" and
-    /// "found 17 unused content types" hash identically — the underlying rule/location is the same.
+    /// Replace every digit run in the message with a single '#' placeholder so volatile counts
+    /// don't churn fingerprints across scans. Note: this strips digits embedded inside tokens too
+    /// (e.g. "rule001" → "rule#"), which is intentional — the structured RuleId/Category/Location
+    /// inputs already carry the stable identifiers, so the message is free to normalize broadly.
+    /// Example: "found 14 unused content types" and "found 17 unused content types" hash identically.
     /// </summary>
     private static string StripVolatile(string value)
     {
