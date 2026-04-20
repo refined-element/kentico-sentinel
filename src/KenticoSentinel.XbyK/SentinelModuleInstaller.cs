@@ -1,10 +1,13 @@
+using CMS.Core;
 using CMS.DataEngine;
 using CMS.FormEngine;
 using CMS.Modules;
+using CMS.Scheduler;
 
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelFinding;
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelFindingAck;
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelScanRun;
+using RefinedElement.Kentico.Sentinel.XbyK.Scheduling;
 
 namespace RefinedElement.Kentico.Sentinel.XbyK;
 
@@ -13,11 +16,16 @@ namespace RefinedElement.Kentico.Sentinel.XbyK;
 /// <c>Install*</c> method is idempotent — <c>Get ?? New</c> + <c>if (HasChanged) Set</c> — so
 /// running on every cold start is a no-op once the tables exist.
 /// </summary>
-public class SentinelModuleInstaller(IInfoProvider<ResourceInfo> resourceProvider)
+public class SentinelModuleInstaller(
+    IInfoProvider<ResourceInfo> resourceProvider,
+    IInfoProvider<ScheduledTaskConfigurationInfo> scheduledTaskProvider,
+    IEventLogService eventLogService)
 {
     private const string ResourceName = "RefinedElement.Sentinel";
 
     private readonly IInfoProvider<ResourceInfo> resourceProvider = resourceProvider;
+    private readonly IInfoProvider<ScheduledTaskConfigurationInfo> scheduledTaskProvider = scheduledTaskProvider;
+    private readonly IEventLogService eventLogService = eventLogService;
 
     public void Install()
     {
@@ -25,6 +33,37 @@ public class SentinelModuleInstaller(IInfoProvider<ResourceInfo> resourceProvide
         InstallScanRun(resource);
         InstallFinding(resource);
         InstallFindingAck(resource);
+        TryInstallDefaultScheduledTask();
+    }
+
+    /// <summary>
+    /// Isolates default-task creation from the rest of the installer. The scheduled task row is
+    /// a UX convenience (saves the admin from opening "New scheduled task" on fresh installs) —
+    /// not a correctness requirement. If Kentico adds column-level validation we haven't
+    /// anticipated, or if the provider isn't available in some embedding, log a clear warning
+    /// so the admin knows to create the task manually, then return — don't fail the whole
+    /// install over it.
+    /// </summary>
+    private void TryInstallDefaultScheduledTask()
+    {
+        try
+        {
+            InstallDefaultScheduledTask();
+        }
+        catch (Exception ex)
+        {
+            // Positional call — LogException's named params are (source, eventCode, exception,
+            // additionalMessage, loggingPolicy); the last two are optional. Kentico prefers
+            // positional here to avoid the CS1739 trap on param name drift.
+            eventLogService.LogException(
+                "Sentinel",
+                "DEFAULT_SCHEDULE_SKIPPED",
+                ex,
+                "Could not upsert the default Sentinel scheduled-task row. " +
+                "This is non-fatal — Sentinel installed its tables and the task class is " +
+                "registered; an admin can still create the scheduled task manually in " +
+                "Configuration → Scheduled tasks (task implementation = Kentico Sentinel scan).");
+        }
     }
 
     private ResourceInfo InitializeResource(ResourceInfo resource)
@@ -168,5 +207,43 @@ public class SentinelModuleInstaller(IInfoProvider<ResourceInfo> resourceProvide
         {
             info.ClassFormDefinition = form.GetXmlDefinition();
         }
+    }
+
+    /// <summary>
+    /// Upserts a disabled <c>CMS_ScheduledTask</c> row for <see cref="SentinelScanTask"/> so
+    /// fresh installs surface the task in the Scheduled Tasks admin app with one click to enable,
+    /// instead of forcing the admin to fill a multi-field "New task" form. Idempotent: if a row
+    /// with the matching identifier already exists (manual or from a prior install), we leave it
+    /// alone — admins may have customized the display name, cadence, or enabled state.
+    ///
+    /// The default interval is weekly, disabled. Admins pick real cadence + enable via the UI.
+    /// We avoid encoding a concrete interval string (the pipe-delimited DB format is not part of
+    /// Kentico's public API) by leaving ScheduledTaskConfigurationInterval at its default —
+    /// Kentico's Scheduled Tasks form will require the admin to pick an interval when they edit
+    /// the row, which is the expected workflow anyway.
+    /// </summary>
+    private void InstallDefaultScheduledTask()
+    {
+        // WhereEquals on the discriminating Identifier column covers both "never installed" and
+        // "installed then manually renamed" cases. We match on the stable code identifier from
+        // [RegisterScheduledTask], not on ScheduledTaskConfigurationName which an admin can edit.
+        var existing = scheduledTaskProvider.Get()
+            .WhereEquals(nameof(ScheduledTaskConfigurationInfo.ScheduledTaskConfigurationScheduledTaskIdentifier), SentinelScanTask.TaskName)
+            .TopN(1)
+            .FirstOrDefault();
+        if (existing is not null)
+        {
+            return;
+        }
+
+        var task = new ScheduledTaskConfigurationInfo
+        {
+            ScheduledTaskConfigurationName = SentinelScanTask.TaskName,
+            ScheduledTaskConfigurationDisplayName = "Kentico Sentinel scan",
+            ScheduledTaskConfigurationScheduledTaskIdentifier = SentinelScanTask.TaskName,
+            ScheduledTaskConfigurationEnabled = false,
+            ScheduledTaskConfigurationDeleteAfterLastRun = false,
+        };
+        scheduledTaskProvider.Set(task);
     }
 }
