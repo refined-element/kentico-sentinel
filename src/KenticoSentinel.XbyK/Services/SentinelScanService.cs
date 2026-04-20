@@ -145,7 +145,10 @@ internal static class SentinelVersion
             .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
             .OfType<System.Reflection.AssemblyInformationalVersionAttribute>()
             .FirstOrDefault()
+            // Null-propagate through BOTH the attribute and InformationalVersion — an assembly
+            // built without the attribute OR with an empty InformationalVersion would otherwise
+            // NRE on .Split, skipping the "unknown" fallback below.
             ?.InformationalVersion
-            .Split('+', 2)[0]
+            ?.Split('+', 2)[0]
         ?? "unknown";
 }
