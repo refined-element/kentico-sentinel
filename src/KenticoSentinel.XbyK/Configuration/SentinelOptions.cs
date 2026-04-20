@@ -20,11 +20,12 @@ public sealed class SentinelOptions
     public RuntimeCheckOptions RuntimeChecks { get; set; } = new();
     public EmailDigestOptions EmailDigest { get; set; } = new();
     public EventLogOptions EventLogIntegration { get; set; } = new();
-    public ContactOptions ContactRefinedElement { get; set; } = new();
 
     // The run cadence lives in Kentico's Scheduled Tasks app (kentico-admin/applications/
-    // scheduled-tasks) once the module installer has registered the task row. No custom cron
-    // option here — admins edit the interval in-situ with the Kentico UI they already know.
+    // scheduled-tasks). The Sentinel task is discovered on startup via the
+    // [RegisterScheduledTask] attribute on SentinelScanTask — the module installer handles
+    // Sentinel's own data-class tables but does not touch the scheduled-task row. No custom
+    // cron option here; admins edit the interval in-situ with the Kentico UI they already know.
 
     public sealed class ChecksOptions
     {
@@ -62,8 +63,6 @@ public sealed class SentinelOptions
         public string SeverityThreshold { get; set; } = "Warning";
     }
 
-    public sealed class ContactOptions
-    {
-        public string Endpoint { get; set; } = "https://kentico-developer.com/api/scanner/submit";
-    }
+    // ContactRefinedElement config lands in the Phase 4 PR along with the actual contact flow.
+    // Kept out of this release to avoid shipping dead option surface.
 }

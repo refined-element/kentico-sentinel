@@ -120,9 +120,10 @@ public partial class SentinelFindingInfo : AbstractInfo<SentinelFindingInfo, IIn
     }
 
     /// <summary>
-    /// SHA-256 hex (first 64 chars) over rule ID + normalized location + canonical message. Used to
-    /// cross-reference acknowledgments: the same underlying issue across repeated scans shares a
-    /// fingerprint, so an ack in one scan persists across the next.
+    /// SHA-256 hex (64 chars total) over rule ID + category + normalized location + canonical
+    /// message. The message is digit-stripped so counts that drift scan-to-scan don't shift the
+    /// hash. Used to cross-reference acknowledgments: the same underlying issue across repeated
+    /// scans shares a fingerprint, so an ack in one scan persists across the next.
     /// </summary>
     [DatabaseField]
     public virtual string SentinelFindingFingerprintHash

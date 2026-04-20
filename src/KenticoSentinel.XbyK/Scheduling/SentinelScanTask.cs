@@ -46,7 +46,9 @@ public sealed class SentinelScanTask : IScheduledTask
             logger.LogInformation("Sentinel scheduled scan completed: run #{RunId}, {Total} findings.",
                 run.SentinelScanRunID, run.SentinelScanRunTotalFindings);
             // Successful runs return the singleton; the admin UI shows "Succeeded" without a message.
-            // Detailed run summary is persisted on the ScanRun row and visible in the Sentinel module.
+            // Detailed run summary is persisted on the Sentinel_ScanRun row (+ related Sentinel_Finding
+            // rows) and mirrored to CMS_EventLog in headless mode. A dedicated admin UI arrives in a
+            // follow-up release.
             return ScheduledTaskExecutionResult.Success;
         }
         catch (OperationCanceledException)

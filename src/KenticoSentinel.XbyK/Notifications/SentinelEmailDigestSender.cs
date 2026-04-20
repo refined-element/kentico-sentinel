@@ -97,7 +97,10 @@ internal sealed class SentinelEmailDigestSender(
             }
         }
 
-        sb.Append("<p style=\"color:#555;font-size:13px;margin:24px 0 0;\">Open the <strong>Sentinel</strong> app in Kentico admin to acknowledge findings, adjust the schedule, or contact Refined Element for remediation.</p>");
+        // Headless mode only in this release — findings are persisted in the `Sentinel_*` tables
+        // and mirrored into CMS_EventLog. Admin UI with acknowledgment + contact flow arrives in
+        // a follow-up release; this message is rewritten then.
+        sb.Append("<p style=\"color:#555;font-size:13px;margin:24px 0 0;\">Full findings are in the Kentico Event log (source = <code>Sentinel</code>) and the <code>Sentinel_*</code> tables in the CMS database.</p>");
         sb.Append("</div></body></html>");
         return sb.ToString();
     }
