@@ -98,14 +98,14 @@ internal sealed class SentinelEmailDigestSender(
             }
             if (highlighted.Count > 10)
             {
-                sb.Append($"<p style=\"color:#555;font-size:13px;margin:10px 0 0;\">… and {highlighted.Count - 10} more at or above threshold. See the Sentinel module in the admin for the full list.</p>");
+                sb.Append($"<p style=\"color:#555;font-size:13px;margin:10px 0 0;\">… and {highlighted.Count - 10} more at or above threshold. See the Kentico Event log (source = <code>Sentinel</code>) or the <code>RefinedElement_Sentinel*</code> tables in the CMS database for the full list.</p>");
             }
         }
 
-        // Headless mode only in this release — findings are persisted in the `Sentinel_*` tables
-        // and mirrored into CMS_EventLog. Admin UI with acknowledgment + contact flow arrives in
-        // a follow-up release; this message is rewritten then.
-        sb.Append("<p style=\"color:#555;font-size:13px;margin:24px 0 0;\">Full findings are in the Kentico Event log (source = <code>Sentinel</code>) and the <code>Sentinel_*</code> tables in the CMS database.</p>");
+        // Headless mode only in this release — findings are persisted in the RefinedElement_Sentinel*
+        // tables and mirrored into CMS_EventLog. Admin UI with acknowledgment + contact flow arrives
+        // in a follow-up release; this message is rewritten then.
+        sb.Append("<p style=\"color:#555;font-size:13px;margin:24px 0 0;\">Full findings are in the Kentico Event log (source = <code>Sentinel</code>) and the <code>RefinedElement_Sentinel*</code> tables in the CMS database.</p>");
         sb.Append("</div></body></html>");
         return sb.ToString();
     }

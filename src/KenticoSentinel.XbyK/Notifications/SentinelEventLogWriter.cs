@@ -67,7 +67,7 @@ internal sealed class SentinelEventLogWriter(IEventLogService eventLog, IOptions
                 eventDescription:
                     $"Sentinel scan #{run.SentinelScanRunID} had {qualifying.Length} findings at or above " +
                     $"{threshold} severity; {suppressed} not written to the event log (MaxEntriesPerScan={cap}). " +
-                    $"Full list is available in the Sentinel_Finding table.");
+                    $"Full list is available in the RefinedElement_SentinelFinding table.");
         }
     }
 }
