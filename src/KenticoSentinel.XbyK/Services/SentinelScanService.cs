@@ -1,6 +1,7 @@
 using CMS.DataEngine;
 using CMS.Helpers;
 
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
@@ -23,6 +24,7 @@ public sealed class SentinelScanService(
     IHttpClientFactory httpClientFactory,
     ISentinelEventLogWriter eventLogWriter,
     ISentinelEmailDigestSender digestSender,
+    IHostEnvironment hostEnvironment,
     ILogger<SentinelScanService> logger)
 {
     private readonly SentinelOptions options = options.Value;
@@ -129,7 +131,11 @@ public sealed class SentinelScanService(
 
         return new ScanContext
         {
-            RepoPath = AppContext.BaseDirectory, // static checks read files relative to the running app
+            // ContentRootPath points at the XbyK project root (the folder containing Program.cs,
+            // the *.csproj, appsettings.json, etc.) which is what the static checks read.
+            // AppContext.BaseDirectory would incorrectly point at bin/<config>/<tfm>/, making
+            // every file-based check report "not found" even in valid installations.
+            RepoPath = hostEnvironment.ContentRootPath,
             ConnectionString = string.IsNullOrWhiteSpace(connectionString) ? null : connectionString,
             StaleDays = options.RuntimeChecks.StaleDays,
             EventLogDays = options.RuntimeChecks.EventLogDays,

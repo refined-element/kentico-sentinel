@@ -40,6 +40,11 @@ internal sealed class SentinelEmailDigestSender(
 
         foreach (var recipient in options.EmailDigest.Recipients.Where(r => !string.IsNullOrWhiteSpace(r)))
         {
+            // Observe cancellation between recipients so a cancelled scheduled task doesn't keep
+            // emailing. Kentico's IEmailService.SendEmail doesn't accept a CancellationToken in the
+            // current XbyK 31.x API; the gap here is between sends, not during one.
+            cancellationToken.ThrowIfCancellationRequested();
+
             var message = new EmailMessage
             {
                 Recipients = recipient,

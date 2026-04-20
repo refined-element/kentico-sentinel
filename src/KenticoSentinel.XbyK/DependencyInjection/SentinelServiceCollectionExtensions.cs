@@ -59,7 +59,5 @@ public static class SentinelServiceCollectionExtensions
         services.AddScoped<SentinelScanService>();
         services.AddScoped<ISentinelEventLogWriter, SentinelEventLogWriter>();
         services.AddScoped<ISentinelEmailDigestSender, SentinelEmailDigestSender>();
-
-        services.AddOptions<SentinelOptions>();
     }
 }
