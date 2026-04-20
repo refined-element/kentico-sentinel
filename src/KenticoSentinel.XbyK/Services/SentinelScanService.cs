@@ -47,6 +47,16 @@ public sealed class SentinelScanService(
             SentinelScanRunTrigger = TruncateTo(trigger, 32),
             SentinelScanRunSentinelVersion = TruncateTo(SentinelVersion.Current, 64),
             SentinelScanRunStatus = "Running",
+            // Count/duration columns are NOT NULL in the installer schema; without an explicit
+            // 0 here Kentico's DataContainer persists them as NULL and SQL rejects the INSERT
+            // ("Cannot insert the value NULL into column 'SentinelScanRunTotalFindings'").
+            // They're re-assigned to the real values inside the transaction below, but we need
+            // valid placeholders for the initial Running row to land.
+            SentinelScanRunTotalFindings = 0,
+            SentinelScanRunErrorCount = 0,
+            SentinelScanRunWarningCount = 0,
+            SentinelScanRunInfoCount = 0,
+            SentinelScanRunDurationSeconds = 0m,
         };
         scanRunProvider.Set(runRow);
 
