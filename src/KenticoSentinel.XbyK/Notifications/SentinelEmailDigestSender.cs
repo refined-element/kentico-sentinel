@@ -1,7 +1,6 @@
 using System.Text;
 
 using CMS.EmailEngine;
-using CMS.Core;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;

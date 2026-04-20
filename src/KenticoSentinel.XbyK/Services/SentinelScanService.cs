@@ -41,8 +41,11 @@ public sealed class SentinelScanService(
         {
             SentinelScanRunGuid = Guid.NewGuid(),
             SentinelScanRunStartedAt = DateTime.UtcNow,
-            SentinelScanRunTrigger = trigger,
-            SentinelScanRunSentinelVersion = SentinelVersion.Current,
+            // Installer-defined column sizes: Trigger=32, Version=64. Current values fit with
+            // room to spare, but clamp as belt-and-suspenders against future trigger strings
+            // or build metadata that sneaks through.
+            SentinelScanRunTrigger = TruncateTo(trigger, 32),
+            SentinelScanRunSentinelVersion = TruncateTo(SentinelVersion.Current, 64),
             SentinelScanRunStatus = "Running",
         };
         scanRunProvider.Set(runRow);
@@ -100,14 +103,36 @@ public sealed class SentinelScanService(
             logger.LogInformation("Sentinel scan completed: run={RunId}, findings={Total} ({Errors}E/{Warnings}W/{Info}I).",
                 runRow.SentinelScanRunID, result.Findings.Count, result.ErrorCount, result.WarningCount, result.InfoCount);
 
+            // Downstream notifiers run OUTSIDE the main try/catch for scan status. The scan +
+            // persistence already succeeded at this point (DB transaction committed above). A
+            // transient SMTP failure or event-log hiccup must NOT retroactively flip the run's
+            // status to "Failed" — the findings are already correct and visible in the DB.
             if (options.EventLogIntegration.Enabled)
             {
-                eventLogWriter.Write(runRow, result.Findings);
+                try
+                {
+                    eventLogWriter.Write(runRow, result.Findings);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "Sentinel scan {RunId} completed, but CMS_EventLog mirroring failed. Findings are still in the DB.",
+                        runRow.SentinelScanRunID);
+                }
             }
 
             if (options.EmailDigest.Enabled && options.EmailDigest.Recipients.Count > 0)
             {
-                await digestSender.SendAsync(runRow, result.Findings, cancellationToken).ConfigureAwait(false);
+                try
+                {
+                    await digestSender.SendAsync(runRow, result.Findings, cancellationToken).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    logger.LogWarning(ex,
+                        "Sentinel scan {RunId} completed, but email digest delivery failed.",
+                        runRow.SentinelScanRunID);
+                }
             }
 
             return runRow;
@@ -116,12 +141,23 @@ public sealed class SentinelScanService(
         {
             runRow.SentinelScanRunCompletedAt = DateTime.UtcNow;
             runRow.SentinelScanRunStatus = "Failed";
-            runRow.SentinelScanRunErrorMessage = ex.Message;
+            // Don't persist raw ex.Message — exception text often contains server names, file paths,
+            // connection-string fragments, and other internals. Store a correlation id (the run's
+            // own GUID) so operators can join the DB row to the logged exception; logger.LogError
+            // below captures the full stack.
+            runRow.SentinelScanRunErrorMessage =
+                $"Scan failed. See application logs with correlation id {runRow.SentinelScanRunGuid:D}.";
             scanRunProvider.Set(runRow);
-            logger.LogError(ex, "Sentinel scan failed for run {RunId}.", runRow.SentinelScanRunID);
+            logger.LogError(ex, "Sentinel scan failed for run {RunId} ({RunGuid}).",
+                runRow.SentinelScanRunID, runRow.SentinelScanRunGuid);
             throw;
         }
     }
+
+    private static string TruncateTo(string value, int maxLength) =>
+        string.IsNullOrEmpty(value) || value.Length <= maxLength
+            ? value ?? string.Empty
+            : value[..maxLength];
 
     private ScanContext BuildContext(IHttpClientFactory factory)
     {

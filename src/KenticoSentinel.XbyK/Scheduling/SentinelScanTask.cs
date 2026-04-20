@@ -4,10 +4,13 @@ using CMS.Scheduler;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-using RefinedElement.Kentico.Sentinel.XbyK.Scheduling;
 using RefinedElement.Kentico.Sentinel.XbyK.Services;
 
-[assembly: RegisterScheduledTask(SentinelScanTask.TaskName, typeof(SentinelScanTask))]
+// Fully-qualified here so the file doesn't need a `using` of its own namespace (CS8019 / noise).
+// The attribute runs during assembly scan, before the `namespace` declaration below takes effect.
+[assembly: RegisterScheduledTask(
+    RefinedElement.Kentico.Sentinel.XbyK.Scheduling.SentinelScanTask.TaskName,
+    typeof(RefinedElement.Kentico.Sentinel.XbyK.Scheduling.SentinelScanTask))]
 
 namespace RefinedElement.Kentico.Sentinel.XbyK.Scheduling;
 
