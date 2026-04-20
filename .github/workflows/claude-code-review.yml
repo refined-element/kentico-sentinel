@@ -12,11 +12,12 @@ on:
 
 jobs:
   claude-review:
-    # Optional: Filter by PR author
-    # if: |
-    #   github.event.pull_request.user.login == 'external-contributor' ||
-    #   github.event.pull_request.user.login == 'new-developer' ||
-    #   github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
+    # Trust gate: only run the automated review for PRs authored by OWNER / MEMBER / COLLABORATOR.
+    # External / first-time contributors can still open PRs, but they won't trigger a billable
+    # Claude run until a maintainer explicitly invokes it via the @claude workflow. This matches
+    # the mention-based workflow's author_association check so both entry points stay aligned.
+    if: |
+      contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
 
     runs-on: ubuntu-latest
     permissions:
