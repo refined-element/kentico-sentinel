@@ -216,11 +216,10 @@ public class SentinelModuleInstaller(
     /// with the matching identifier already exists (manual or from a prior install), we leave it
     /// alone — admins may have customized the display name, cadence, or enabled state.
     ///
-    /// The default interval is weekly, disabled. Admins pick real cadence + enable via the UI.
-    /// We avoid encoding a concrete interval string (the pipe-delimited DB format is not part of
-    /// Kentico's public API) by leaving ScheduledTaskConfigurationInterval at its default —
-    /// Kentico's Scheduled Tasks form will require the admin to pick an interval when they edit
-    /// the row, which is the expected workflow anyway.
+    /// Created disabled with no interval set. Admins pick cadence + enable via the UI.
+    /// We intentionally leave ScheduledTaskConfigurationInterval unset — the pipe-delimited DB
+    /// format is not part of Kentico's public API, and Kentico's Scheduled Tasks form requires
+    /// the admin to pick an interval when they edit the row, which is the expected workflow.
     /// </summary>
     private void InstallDefaultScheduledTask()
     {
