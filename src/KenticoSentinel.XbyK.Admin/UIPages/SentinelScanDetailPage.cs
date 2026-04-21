@@ -150,10 +150,28 @@ public class SentinelScanDetailPage(
         return sb.ToString();
     }
 
-    private static string Csv(string value) =>
-        value.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0
-            ? "\"" + value.Replace("\"", "\"\"") + "\""
+    // Cached needle for IndexOfAny — allocating `new[] {...}` per Csv() call would make the
+    // hot path of exporting a 10k-finding scan produce 110k needless char[] instances.
+    private static readonly char[] CsvSpecialChars = [',', '"', '\n', '\r'];
+
+    // Leading characters Excel / Google Sheets interpret as formula starts — CSV injection vector.
+    // A cell that starts with any of these gets apostrophe-prefixed so the spreadsheet renders it
+    // as literal text instead of evaluating `=HYPERLINK(...)` / `+SUM(...)` / etc.
+    private static readonly char[] FormulaTriggers = ['=', '+', '-', '@'];
+
+    private static string Csv(string value)
+    {
+        // Defuse CSV/Excel formula-injection: a finding message (operator-controlled) that reads
+        // like "=HYPERLINK(...)" would execute in a spreadsheet client. Prefix with apostrophe;
+        // Excel strips it on display while still treating the cell as text. Applied BEFORE the
+        // RFC 4180 quoting step so the apostrophe is inside the quoted value.
+        var defused = value.Length > 0 && Array.IndexOf(FormulaTriggers, value[0]) >= 0
+            ? "'" + value
             : value;
+        return defused.IndexOfAny(CsvSpecialChars) >= 0
+            ? "\"" + defused.Replace("\"", "\"\"") + "\""
+            : defused;
+    }
 
     /// <summary>
     /// Bulk variant of <see cref="SetAckState"/>. Applies the same action + note to every
@@ -165,6 +183,13 @@ public class SentinelScanDetailPage(
     [PageCommand(Permission = SystemPermissions.UPDATE)]
     public async Task<ICommandResponse<BulkAckResponse>> SetAckStateMany(BulkAckData data)
     {
+        // Guard against a null payload BEFORE dereferencing data.Fingerprints — Kentico's page
+        // command pipeline deserializes the body to BulkAckData but doesn't guarantee non-null.
+        if (data is null)
+        {
+            return ResponseFrom(new BulkAckResponse { Success = false, Message = "No findings selected." });
+        }
+
         var user = await userAccessor.Get();
         if (user is null)
         {

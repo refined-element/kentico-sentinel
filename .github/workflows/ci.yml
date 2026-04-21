@@ -63,7 +63,12 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Test
-        run: dotnet test KenticoSentinel.slnx --configuration Release --no-build --verbosity minimal --logger "trx;LogFileName=test-results.trx"
+        # Pin --results-directory so the TRX file lands in a predictable location regardless of
+        # whether `dotnet test` is invoked from the solution root or a project directory. Without
+        # the flag, TRX lands under `<project>/TestResults/` only when run from the project dir;
+        # from the solution root it can end up under `<cwd>/TestResults/` and the artifact upload
+        # below would miss it.
+        run: dotnet test KenticoSentinel.slnx --configuration Release --no-build --verbosity minimal --logger "trx;LogFileName=test-results.trx" --results-directory tests/KenticoSentinel.Tests/TestResults
 
       # Upload test results so a reviewer can pull TRX output from a failed run. We don't
       # ship the webpack bundle here — the release workflow handles packaging, and the admin

@@ -82,11 +82,11 @@ public static class RemediationGuide
         "Inspect the flagged item, decide whether it's a real issue, and either fix it or acknowledge the finding if you've judged it acceptable for your project.");
 
     /// <summary>Returns the guidance entry for <paramref name="ruleId"/>, or the generic fallback.</summary>
-    public static RemediationEntry For(string ruleId) =>
+    public static RemediationEntry For(string? ruleId) =>
         Entries.TryGetValue(ruleId ?? string.Empty, out var entry) ? entry : GenericFallback;
 
     /// <summary>Returns the guidance entry only if a rule-specific one exists — null otherwise.</summary>
-    public static RemediationEntry? TryFor(string ruleId) =>
+    public static RemediationEntry? TryFor(string? ruleId) =>
         Entries.TryGetValue(ruleId ?? string.Empty, out var entry) ? entry : null;
 
     /// <summary>All registered rule IDs — for docs generation, admin UI autocomplete, etc.</summary>

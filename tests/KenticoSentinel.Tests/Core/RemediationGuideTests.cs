@@ -44,6 +44,8 @@ public class RemediationGuideTests
     {
         Assert.Equal(RemediationGuide.GenericFallback, RemediationGuide.For(string.Empty));
         Assert.Null(RemediationGuide.TryFor(string.Empty));
+        Assert.Equal(RemediationGuide.GenericFallback, RemediationGuide.For(null));
+        Assert.Null(RemediationGuide.TryFor(null));
     }
 
     [Fact]
