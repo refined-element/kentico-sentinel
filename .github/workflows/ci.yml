@@ -65,8 +65,9 @@ jobs:
       - name: Test
         run: dotnet test KenticoSentinel.slnx --configuration Release --no-build --verbosity minimal --logger "trx;LogFileName=test-results.trx"
 
-      # Upload test results + admin client bundle so a reviewer can pull the built artifacts
-      # from a failed run if needed.
+      # Upload test results so a reviewer can pull TRX output from a failed run. We don't
+      # ship the webpack bundle here — the release workflow handles packaging, and the admin
+      # client is fully reproducible from source so a CI artifact would just be noise.
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4

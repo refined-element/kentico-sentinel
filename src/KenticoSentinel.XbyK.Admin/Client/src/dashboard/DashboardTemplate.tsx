@@ -260,7 +260,7 @@ const KpiRow = ({ scan, previous }: { scan: ScanSummary | null; previous: ScanSu
     // since "more findings" could mean the scanner got smarter, not the site got worse.
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            <KpiTile label="Total findings" value={scan.totalFindings} delta={delta(scan.totalFindings, previous?.totalFindings)} deltaInvertTone />
+            <KpiTile label="Total findings" value={scan.totalFindings} delta={delta(scan.totalFindings, previous?.totalFindings)} />
             <KpiTile label="Errors" value={scan.errorCount} color={scan.errorCount > 0 ? COLORS.error : COLORS.info} delta={delta(scan.errorCount, previous?.errorCount)} deltaInvertTone />
             <KpiTile label="Warnings" value={scan.warningCount} color={scan.warningCount > 0 ? COLORS.warning : COLORS.info} delta={delta(scan.warningCount, previous?.warningCount)} deltaInvertTone />
             <KpiTile label="Info" value={scan.infoCount} color={COLORS.info} delta={delta(scan.infoCount, previous?.infoCount)} deltaInvertTone />

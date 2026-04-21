@@ -2,7 +2,7 @@
   "name": "sentinel-admin",
   "version": "0.3.0",
   "private": true,
-  "description": "React client for the Kentico Sentinel admin UI (Dashboard + Contact form).",
+  "description": "React client for the Kentico Sentinel admin UI (Dashboard, Scan detail, Diff, Settings, Contact form).",
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "tsc --noEmit && webpack --mode production",

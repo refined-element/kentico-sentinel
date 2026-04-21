@@ -198,6 +198,7 @@ public class SentinelDashboardPage(
         var since = DateTime.UtcNow.Date.AddDays(-TrendDays + 1);
         var recent = scanRunProvider.Get()
             .WhereGreaterOrEquals(nameof(SentinelScanRunInfo.SentinelScanRunStartedAt), since)
+            .WhereEquals(nameof(SentinelScanRunInfo.SentinelScanRunStatus), "Completed")
             .Columns(
                 nameof(SentinelScanRunInfo.SentinelScanRunStartedAt),
                 nameof(SentinelScanRunInfo.SentinelScanRunErrorCount),
@@ -205,15 +206,23 @@ public class SentinelDashboardPage(
                 nameof(SentinelScanRunInfo.SentinelScanRunInfoCount))
             .ToList();
 
+        // Represent each day by the LATEST completed scan rather than summing across runs —
+        // otherwise an admin who kicks a manual "run now" twice on the same day produces a 2× spike
+        // on the trend line that doesn't reflect an actual severity change. Failed/partial runs are
+        // filtered upstream by the WhereEquals("Completed") clause so they can't skew the point.
         var byDay = recent
             .GroupBy(r => r.SentinelScanRunStartedAt.Date)
             .ToDictionary(
                 g => g.Key,
-                g => new
+                g =>
                 {
-                    Errors = g.Sum(r => r.SentinelScanRunErrorCount),
-                    Warnings = g.Sum(r => r.SentinelScanRunWarningCount),
-                    Info = g.Sum(r => r.SentinelScanRunInfoCount),
+                    var latest = g.OrderByDescending(r => r.SentinelScanRunStartedAt).First();
+                    return new
+                    {
+                        Errors = latest.SentinelScanRunErrorCount,
+                        Warnings = latest.SentinelScanRunWarningCount,
+                        Info = latest.SentinelScanRunInfoCount,
+                    };
                 });
 
         var result = new TrendPointDto[TrendDays];

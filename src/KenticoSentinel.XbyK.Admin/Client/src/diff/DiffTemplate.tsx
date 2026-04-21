@@ -153,7 +153,24 @@ export const DiffTemplate = (initial: DiffClientProperties) => {
                 />
             </div>
 
-            {diff && (
+            {diff?.message && (
+                <div
+                    role="alert"
+                    style={{
+                        padding: '10px 14px',
+                        marginBottom: 16,
+                        background: '#FEF2F2',
+                        border: `1px solid ${COLORS.error}`,
+                        borderRadius: 8,
+                        color: '#7F1D1D',
+                        fontSize: 13,
+                    }}
+                >
+                    {diff.message}
+                </div>
+            )}
+
+            {diff && !diff.message && (
                 <>
                     <SummaryRow diff={diff} />
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 16 }}>
