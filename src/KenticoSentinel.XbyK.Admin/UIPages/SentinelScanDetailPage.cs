@@ -181,11 +181,27 @@ public class SentinelScanDetailPage(
             return ResponseFrom(new BulkAckResponse { Success = false, Message = "No findings selected." });
         }
 
+        // Filter to fingerprints that satisfy the 64-hex-char SHA-256 invariant BEFORE handing
+        // to the service. The service's Deduplicate helper applies the same filter, but doing it
+        // here lets us report the skipped count back to the caller so a client passing garbled
+        // data sees a clear "N skipped" message instead of silent loss.
+        var valid = data.Fingerprints.Where(FingerprintFormat.IsValid).ToArray();
+        var skipped = data.Fingerprints.Length - valid.Length;
+        if (valid.Length == 0)
+        {
+            return ResponseFrom(new BulkAckResponse
+            {
+                Success = false,
+                Message = "No valid fingerprints in request — all entries were malformed.",
+                RequestedCount = data.Fingerprints.Length,
+            });
+        }
+
         int written;
         switch (data.Action)
         {
             case "acknowledge":
-                written = ackService.AcknowledgeMany(data.Fingerprints, userId, data.Note);
+                written = ackService.AcknowledgeMany(valid, userId, data.Note);
                 break;
             case "snooze":
                 if (!DateTime.TryParseExact(
@@ -209,10 +225,10 @@ public class SentinelScanDetailPage(
                         Message = "Snooze date must be at least one minute in the future.",
                     });
                 }
-                written = ackService.SnoozeMany(data.Fingerprints, until, userId, data.Note);
+                written = ackService.SnoozeMany(valid, until, userId, data.Note);
                 break;
             case "revoke":
-                written = ackService.RevokeMany(data.Fingerprints);
+                written = ackService.RevokeMany(valid);
                 break;
             default:
                 return ResponseFrom(new BulkAckResponse { Success = false, Message = $"Unknown action '{data.Action}'." });
@@ -220,8 +236,8 @@ public class SentinelScanDetailPage(
 
         // Re-fetch state for each affected fingerprint so the client can patch per-row chips
         // without reloading the whole scan.
-        var newStates = ackService.GetAll(data.Fingerprints);
-        var updates = data.Fingerprints
+        var newStates = ackService.GetAll(valid);
+        var updates = valid
             .Select(fp =>
             {
                 newStates.TryGetValue(fp, out var state);
@@ -235,6 +251,7 @@ public class SentinelScanDetailPage(
             })
             .ToArray();
 
+        var skippedSuffix = skipped > 0 ? $" ({skipped} skipped — malformed fingerprint)" : string.Empty;
         return ResponseFrom(new BulkAckResponse
         {
             Success = true,
@@ -243,10 +260,10 @@ public class SentinelScanDetailPage(
             Updates = updates,
             Message = data.Action switch
             {
-                "acknowledge" => $"Acknowledged {written} finding{(written == 1 ? string.Empty : "s")}.",
-                "snooze" => $"Snoozed {written} finding{(written == 1 ? string.Empty : "s")}.",
-                "revoke" => $"Revoked ack on {written} finding{(written == 1 ? string.Empty : "s")}.",
-                _ => $"Processed {written} finding(s).",
+                "acknowledge" => $"Acknowledged {written} finding{(written == 1 ? string.Empty : "s")}{skippedSuffix}.",
+                "snooze" => $"Snoozed {written} finding{(written == 1 ? string.Empty : "s")}{skippedSuffix}.",
+                "revoke" => $"Revoked ack on {written} finding{(written == 1 ? string.Empty : "s")}{skippedSuffix}.",
+                _ => $"Processed {written} finding(s){skippedSuffix}.",
             },
         });
     }
@@ -254,15 +271,16 @@ public class SentinelScanDetailPage(
     [PageCommand(Permission = SystemPermissions.UPDATE)]
     public async Task<ICommandResponse<AckMutationResponse>> SetAckState(AckMutationData data)
     {
-        // Validate fingerprint BEFORE handing to the service — ackService.Upsert throws
-        // ArgumentException on blank fingerprints and that would escape as a 500. Return a
-        // clean failure result instead so the admin UI can render the error inline.
-        if (data is null || string.IsNullOrWhiteSpace(data.Fingerprint))
+        // Validate fingerprint format BEFORE handing to the service. The ack table column is
+        // sized for exactly 64 hex chars (SHA-256 digest); passing anything else would either
+        // escape as a 500 from the service's invariant check or truncate on DB write. Return a
+        // clean failure result so the admin UI renders a usable error instead of a stack trace.
+        if (data is null || !FingerprintFormat.IsValid(data.Fingerprint))
         {
             return ResponseFrom(new AckMutationResponse
             {
                 Success = false,
-                Message = "Finding fingerprint is required.",
+                Message = "Finding fingerprint is missing or malformed.",
             });
         }
 

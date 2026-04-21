@@ -5,6 +5,38 @@ using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelFindingAck;
 namespace RefinedElement.Kentico.Sentinel.XbyK.Acknowledgment;
 
 /// <summary>
+/// Format invariant for <c>SentinelFindingFingerprintHash</c> — a SHA-256 hex digest
+/// produced by <c>FindingFingerprint.Compute</c>. The DB column is sized for exactly 64 chars;
+/// anything else would truncate on write and produce a confusing 500. Call
+/// <see cref="FingerprintFormat.IsValid"/> at every layer that accepts a fingerprint from
+/// outside code (page commands, API callers) before handing to the persistence layer.
+/// </summary>
+public static class FingerprintFormat
+{
+    /// <summary>Expected fingerprint length (SHA-256 hex digest = 32 bytes × 2 chars).</summary>
+    public const int Length = 64;
+
+    /// <summary>Returns true iff the value is a 64-char lowercase-or-uppercase hex string.</summary>
+    public static bool IsValid(string? value)
+    {
+        if (value is null || value.Length != Length)
+        {
+            return false;
+        }
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            var isHex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || (c >= 'A' && c <= 'F');
+            if (!isHex)
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+}
+
+/// <summary>
 /// Info-provider backed implementation. Snoozed rows whose <c>SnoozeUntil</c> has passed are
 /// reported as <see cref="AckState.Active"/> on read — the row stays in the DB so re-snooze
 /// or conversion to Acknowledged preserves the operator note, but the finding visibly
@@ -121,16 +153,25 @@ internal sealed class SentinelFindingAckService(
         return rows.Count;
     }
 
-    // Strip whitespace-only fingerprints AND duplicates before any bulk writer iterates. Keeps
-    // the per-method code focused on the actual operation.
+    // Strip whitespace-only AND malformed fingerprints, then dedupe. The 64-char SHA-256-hex
+    // invariant is enforced here (bulk entry point) and again inside Upsert (single entry point)
+    // so a bug in one caller can't slip bad data past the other.
     private static IEnumerable<string> Deduplicate(IEnumerable<string> fingerprints) =>
         fingerprints
-            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Where(FingerprintFormat.IsValid)
             .Distinct(StringComparer.OrdinalIgnoreCase);
 
     private void Upsert(string fingerprint, string state, DateTime? snoozeUntil, int userId, string? note)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
+        if (!FingerprintFormat.IsValid(fingerprint))
+        {
+            // Caught by the UI command's pre-validation under normal flow. Throwing here is a
+            // service-boundary invariant: a malformed fingerprint can't be persisted — the DB
+            // column is sized for exactly 64 hex chars and a write would truncate silently.
+            throw new ArgumentException(
+                $"Fingerprint must be a {FingerprintFormat.Length}-character hex string (SHA-256 digest).",
+                nameof(fingerprint));
+        }
 
         var row = LoadRow(fingerprint) ?? new SentinelFindingAckInfo
         {
