@@ -1,0 +1,327 @@
+import React, { useState } from 'react';
+import { usePageCommand } from '@kentico/xperience-admin-base';
+import { Button, ButtonColor, ButtonSize } from '@kentico/xperience-admin-components';
+
+// Keep this file server-contract-shaped: the exported interfaces mirror
+// SentinelDashboardPage.DashboardClientProperties on the C# side. If you add a
+// field server-side, mirror it here and recompile both halves.
+
+interface ScanSummary {
+    readonly runId: number;
+    readonly startedAt: string;
+    readonly status: string;
+    readonly trigger: string;
+    readonly totalFindings: number;
+    readonly errorCount: number;
+    readonly warningCount: number;
+    readonly infoCount: number;
+    readonly durationSeconds: number;
+    readonly sentinelVersion: string;
+}
+
+interface RuleCount {
+    readonly ruleId: string;
+    readonly category: string;
+    readonly count: number;
+}
+
+interface DashboardClientProperties {
+    readonly hasScans: boolean;
+    readonly latestScan: ScanSummary | null;
+    readonly recentScans: ReadonlyArray<ScanSummary>;
+    readonly topRules: ReadonlyArray<RuleCount>;
+    readonly scheduledTasksUrl: string;
+    readonly findingsUrl: string;
+    readonly scanHistoryUrl: string;
+}
+
+interface DashboardRefreshResult {
+    readonly data: DashboardClientProperties;
+}
+
+// Palette — Refined Element lime (#D6F08D) as the accent, muted neutrals for the rest so the
+// admin shell's chrome stays visually dominant. Error red / warning orange / info grey are
+// Kentico-adjacent so the dashboard reads at a glance without a legend.
+const COLORS = {
+    lime: '#D6F08D',
+    limeDark: '#B8D870',
+    bg: '#FFFFFF',
+    bgMuted: '#F7F7F9',
+    border: '#E5E7EB',
+    textPrimary: '#1A1A2E',
+    textMuted: '#6B7280',
+    error: '#DC2626',
+    warning: '#D97706',
+    info: '#6B7280',
+    success: '#10B981',
+} as const;
+
+export const DashboardTemplate = (initial: DashboardClientProperties) => {
+    const [data, setData] = useState<DashboardClientProperties>(initial);
+
+    // GetDashboardData re-pulls the same shape from the server — refreshing doesn't re-render
+    // the page shell, just the data region. Keeps the dashboard feeling live when a scan
+    // completes in a neighboring browser tab.
+    const { execute: refresh, isPending: isRefreshing } =
+        usePageCommand<DashboardRefreshResult>('GetDashboardData', {
+            after: (result) => {
+                if (result?.data) {
+                    setData(result.data);
+                }
+            },
+        });
+
+    if (!data.hasScans) {
+        return <EmptyState scheduledTasksUrl={data.scheduledTasksUrl} />;
+    }
+
+    return (
+        <div style={{ padding: '24px 32px', maxWidth: 1200, margin: '0 auto' }}>
+            <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+                <div>
+                    <h1 style={{ margin: 0, fontSize: 24, fontWeight: 600, color: COLORS.textPrimary }}>
+                        Sentinel dashboard
+                    </h1>
+                    <p style={{ margin: '4px 0 0', color: COLORS.textMuted, fontSize: 14 }}>
+                        {data.latestScan ? `Last scan: #${data.latestScan.runId} · ${formatRelative(data.latestScan.startedAt)}` : 'No scans yet.'}
+                    </p>
+                </div>
+                <Button
+                    label={isRefreshing ? 'Refreshing…' : 'Refresh'}
+                    onClick={() => refresh()}
+                    size={ButtonSize.S}
+                    color={ButtonColor.Secondary}
+                    disabled={isRefreshing}
+                />
+            </header>
+
+            <KpiRow scan={data.latestScan} />
+
+            <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr', gap: 24, marginTop: 24 }}>
+                <Panel title="Recent scans" linkText="View all" linkHref={data.scanHistoryUrl}>
+                    <RecentScansList scans={data.recentScans} />
+                </Panel>
+                <Panel title="Top rule offenders" linkText="View findings" linkHref={data.findingsUrl}>
+                    <TopRulesList rules={data.topRules} />
+                </Panel>
+            </div>
+
+            <footer style={{ marginTop: 24, padding: 16, background: COLORS.bgMuted, borderRadius: 8, fontSize: 13, color: COLORS.textMuted }}>
+                Cadence is configured in <a href={data.scheduledTasksUrl} style={{ color: COLORS.limeDark, fontWeight: 600 }}>Scheduled tasks</a>.
+                Sentinel runs on whatever interval you set there — edit the row named <code>RefinedElement.SentinelScan</code> to change it or
+                hit <em>Execute now</em> for an on-demand run.
+            </footer>
+        </div>
+    );
+};
+
+const EmptyState = ({ scheduledTasksUrl }: { scheduledTasksUrl: string }) => (
+    <div style={{ padding: 48, maxWidth: 640, margin: '64px auto', textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16, opacity: 0.4 }}>◎</div>
+        <h2 style={{ margin: '0 0 12px', fontSize: 20, color: COLORS.textPrimary }}>No scans recorded yet</h2>
+        <p style={{ margin: '0 0 24px', color: COLORS.textMuted, fontSize: 14, lineHeight: 1.6 }}>
+            Sentinel's tables are provisioned and the scheduled task is registered. Enable the task in Scheduled
+            tasks and click <em>Execute now</em> to run your first scan — the dashboard populates immediately after.
+        </p>
+        <a
+            href={scheduledTasksUrl}
+            style={{
+                display: 'inline-block',
+                padding: '10px 20px',
+                background: COLORS.lime,
+                color: COLORS.textPrimary,
+                borderRadius: 6,
+                textDecoration: 'none',
+                fontWeight: 600,
+                fontSize: 14,
+            }}
+        >
+            Open Scheduled tasks
+        </a>
+    </div>
+);
+
+const KpiRow = ({ scan }: { scan: ScanSummary | null }) => {
+    if (!scan) return null;
+    return (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
+            <KpiTile label="Total findings" value={scan.totalFindings} />
+            <KpiTile label="Errors" value={scan.errorCount} color={scan.errorCount > 0 ? COLORS.error : COLORS.info} />
+            <KpiTile label="Warnings" value={scan.warningCount} color={scan.warningCount > 0 ? COLORS.warning : COLORS.info} />
+            <KpiTile label="Info" value={scan.infoCount} color={COLORS.info} />
+        </div>
+    );
+};
+
+const KpiTile = ({ label, value, color = COLORS.textPrimary }: { label: string; value: number; color?: string }) => (
+    <div
+        style={{
+            padding: 20,
+            background: COLORS.bg,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 10,
+            borderLeft: `4px solid ${color}`,
+        }}
+    >
+        <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 6 }}>{label}</div>
+        <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
+    </div>
+);
+
+const Panel = ({
+    title,
+    linkText,
+    linkHref,
+    children,
+}: {
+    title: string;
+    linkText?: string;
+    linkHref?: string;
+    children: React.ReactNode;
+}) => (
+    <section
+        style={{
+            background: COLORS.bg,
+            border: `1px solid ${COLORS.border}`,
+            borderRadius: 10,
+            overflow: 'hidden',
+        }}
+    >
+        <header
+            style={{
+                padding: '14px 20px',
+                borderBottom: `1px solid ${COLORS.border}`,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                background: COLORS.bgMuted,
+            }}
+        >
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 600, color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                {title}
+            </h3>
+            {linkText && linkHref && (
+                <a href={linkHref} style={{ fontSize: 13, color: COLORS.limeDark, textDecoration: 'none', fontWeight: 600 }}>
+                    {linkText} →
+                </a>
+            )}
+        </header>
+        <div>{children}</div>
+    </section>
+);
+
+const RecentScansList = ({ scans }: { scans: ReadonlyArray<ScanSummary> }) => {
+    if (scans.length === 0) {
+        return <div style={{ padding: 20, color: COLORS.textMuted, fontSize: 14 }}>No recent scans.</div>;
+    }
+    return (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {scans.map((s, i) => (
+                <li
+                    key={s.runId}
+                    style={{
+                        padding: '12px 20px',
+                        borderBottom: i < scans.length - 1 ? `1px solid ${COLORS.border}` : 'none',
+                        display: 'grid',
+                        gridTemplateColumns: '60px 1fr auto',
+                        gap: 16,
+                        alignItems: 'center',
+                        fontSize: 14,
+                    }}
+                >
+                    <span style={{ color: COLORS.textMuted, fontFamily: 'monospace' }}>#{s.runId}</span>
+                    <div>
+                        <div style={{ color: COLORS.textPrimary, fontWeight: 500 }}>
+                            {formatRelative(s.startedAt)} · {s.trigger}
+                        </div>
+                        <div style={{ color: COLORS.textMuted, fontSize: 12 }}>
+                            {s.durationSeconds.toFixed(1)}s · {s.status} · v{s.sentinelVersion}
+                        </div>
+                    </div>
+                    <SeverityPills scan={s} />
+                </li>
+            ))}
+        </ul>
+    );
+};
+
+const SeverityPills = ({ scan }: { scan: ScanSummary }) => (
+    <div style={{ display: 'flex', gap: 6 }}>
+        {scan.errorCount > 0 && <Pill count={scan.errorCount} color={COLORS.error} label="E" />}
+        {scan.warningCount > 0 && <Pill count={scan.warningCount} color={COLORS.warning} label="W" />}
+        {scan.infoCount > 0 && <Pill count={scan.infoCount} color={COLORS.info} label="I" />}
+        {scan.totalFindings === 0 && <Pill count={0} color={COLORS.success} label="✓" />}
+    </div>
+);
+
+const Pill = ({ count, color, label }: { count: number; color: string; label: string }) => (
+    <span
+        style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 3,
+            padding: '2px 8px',
+            fontSize: 12,
+            fontWeight: 600,
+            color: '#FFF',
+            background: color,
+            borderRadius: 10,
+            minWidth: 28,
+            justifyContent: 'center',
+        }}
+    >
+        {count > 0 ? count : ''}
+        {label}
+    </span>
+);
+
+const TopRulesList = ({ rules }: { rules: ReadonlyArray<RuleCount> }) => {
+    if (rules.length === 0) {
+        return <div style={{ padding: 20, color: COLORS.textMuted, fontSize: 14 }}>No findings across recent scans.</div>;
+    }
+    const max = Math.max(...rules.map((r) => r.count));
+    return (
+        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+            {rules.map((r, i) => (
+                <li
+                    key={r.ruleId}
+                    style={{
+                        padding: '12px 20px',
+                        borderBottom: i < rules.length - 1 ? `1px solid ${COLORS.border}` : 'none',
+                        fontSize: 14,
+                    }}
+                >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                        <span style={{ fontFamily: 'monospace', color: COLORS.textPrimary, fontWeight: 600 }}>{r.ruleId}</span>
+                        <span style={{ color: COLORS.textMuted, fontSize: 12 }}>{r.count} · {r.category}</span>
+                    </div>
+                    <div style={{ background: COLORS.bgMuted, height: 4, borderRadius: 2, overflow: 'hidden' }}>
+                        <div
+                            style={{
+                                width: `${Math.round((r.count / max) * 100)}%`,
+                                height: '100%',
+                                background: COLORS.lime,
+                            }}
+                        />
+                    </div>
+                </li>
+            ))}
+        </ul>
+    );
+};
+
+// Relative time is friendlier than absolute for the recency cases operators actually care about.
+// For anything older than a week we fall back to the locale date so the label stays informative.
+const formatRelative = (iso: string): string => {
+    const then = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - then.getTime();
+    const diffMin = Math.round(diffMs / 60000);
+    if (diffMin < 1) return 'just now';
+    if (diffMin < 60) return `${diffMin}m ago`;
+    const diffHr = Math.round(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ago`;
+    const diffDay = Math.round(diffHr / 24);
+    if (diffDay < 7) return `${diffDay}d ago`;
+    return then.toLocaleDateString();
+};

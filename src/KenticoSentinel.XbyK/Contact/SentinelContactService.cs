@@ -11,11 +11,12 @@ using RefinedElement.Kentico.Sentinel.XbyK.Configuration;
 namespace RefinedElement.Kentico.Sentinel.XbyK.Contact;
 
 /// <summary>
-/// Typed-HttpClient implementation — the DI container injects the pre-configured client (30 s
-/// timeout and user agent set in <c>SentinelServiceCollectionExtensions</c>). The service
-/// layer's job is: resolve the endpoint from <see cref="SentinelOptions.ContactOptions.Endpoint"/>,
-/// POST JSON, translate exceptions into a result object so callers never have to catch
-/// <see cref="HttpRequestException"/> themselves.
+/// Typed-HttpClient implementation — the DI container injects a client whose defaults
+/// (30 s timeout, <c>KenticoSentinel-XbyK</c> user agent) are set in
+/// <c>SentinelServiceCollectionExtensions</c>. The service layer's job is: resolve the endpoint
+/// from <see cref="SentinelOptions.ContactOptions.Endpoint"/>, validate it as an absolute
+/// http(s) URL, POST JSON, translate exceptions into a result object so callers never have to
+/// catch <see cref="HttpRequestException"/> themselves.
 /// </summary>
 internal sealed class SentinelContactService(
     HttpClient httpClient,

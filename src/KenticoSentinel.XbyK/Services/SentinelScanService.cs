@@ -117,11 +117,25 @@ public sealed class SentinelScanService(
             // persistence already succeeded at this point (DB transaction committed above). A
             // transient SMTP failure or event-log hiccup must NOT retroactively flip the run's
             // status to "Failed" — the findings are already correct and visible in the DB.
+            // Project the heavyweight Info object into a lean DTO once — notifiers consume the
+            // DTO so they stay testable without Kentico's IoC bootstrapping, and the projection
+            // keeps the run-row state frozen at completion time regardless of what else mutates
+            // the Info instance afterwards.
+            var summary = new ScanRunSummary(
+                RunId: runRow.SentinelScanRunID,
+                TotalFindings: runRow.SentinelScanRunTotalFindings,
+                ErrorCount: runRow.SentinelScanRunErrorCount,
+                WarningCount: runRow.SentinelScanRunWarningCount,
+                InfoCount: runRow.SentinelScanRunInfoCount,
+                Trigger: runRow.SentinelScanRunTrigger,
+                SentinelVersion: runRow.SentinelScanRunSentinelVersion,
+                CompletedAtUtc: runRow.SentinelScanRunCompletedAt);
+
             if (options.EventLogIntegration.Enabled)
             {
                 try
                 {
-                    eventLogWriter.Write(runRow, result.Findings);
+                    eventLogWriter.Write(summary, result.Findings);
                 }
                 catch (Exception ex)
                 {
@@ -135,7 +149,7 @@ public sealed class SentinelScanService(
             {
                 try
                 {
-                    await digestSender.SendAsync(runRow, result.Findings, cancellationToken).ConfigureAwait(false);
+                    await digestSender.SendAsync(summary, result.Findings, cancellationToken).ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {
