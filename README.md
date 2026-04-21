@@ -86,11 +86,25 @@ Cadence lives in Kentico's Scheduled Tasks UI — no cron config in code.
 - **`RefinedElement_SentinelFindingAck`** — one row per acknowledged/snoozed finding, keyed by fingerprint. The installer provisions the table so deploys don't need a migration step when the Admin UI (v0.3.x) lights up the ack actions; it stays empty until then.
 - **`CMS_EventLog`** — summary entry per scan (source = `Sentinel`) + one entry per finding at or above `SeverityThreshold`, up to `EventLogIntegration.MaxEntriesPerScan`; if more findings qualify, Sentinel writes a single additional summary noting the suppressed event-log entries
 
-### 6. Admin UI *(preview — v0.3.0-alpha in active review on the `feat/admin-ui*` branches)*
+### 6. Admin UI (optional)
 
-A companion package `RefinedElement.Kentico.Sentinel.XbyK.Admin` adds **Configuration → Sentinel** to the admin left-nav. When it merges it will include Dashboard / Scan history / Findings / Scan detail / Compare scans / Request-a-quote / Settings pages. Drop the reference in, no extra DI wiring needed.
+The companion package **`RefinedElement.Kentico.Sentinel.XbyK.Admin`** adds **Configuration → Sentinel** to the admin left-nav with:
 
-**Not on `main` yet** — track progress in the repo's open PRs. This README will be updated with install instructions (and a concrete NuGet version) when v0.3.0-alpha publishes.
+- **Dashboard** — latest scan KPIs, 30-day severity trend, recent scans, top rule offenders with inline remediation
+- **Scan history** — every scan run, sortable + filterable
+- **Findings** — every finding across scans
+- **Scan detail** — drill into a single scan, per-finding acknowledge / snooze / revoke (individual and bulk)
+- **Compare scans** — fingerprint-keyed diff: Introduced / Resolved / Still open
+- **Request a quote** — in-admin form that submits a sanitized scan snapshot to Refined Element
+- **Settings** — read-only display of effective config
+
+Install (once v0.3.0-alpha is published to NuGet):
+
+```xml
+<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK.Admin" Version="0.3.0-alpha" />
+```
+
+No extra `Program.cs` wiring — the existing `AddKenticoSentinel()` call covers DI. The admin pages surface automatically.
 
 ## CLI (alternative / CI)
 
@@ -222,7 +236,7 @@ dotnet test KenticoSentinel.slnx    # 36+ unit tests — checks, sanitizer, runn
 |---|---|
 | `src/KenticoSentinel.Core` | Check engine, registry, sanitizer, reporting. Framework-agnostic. |
 | `src/KenticoSentinel.XbyK` | Embedded XbyK integration — Info models, installer, scheduled task, notifiers. |
-| `src/KenticoSentinel.XbyK.Admin` | *(preview — on `feat/admin-ui*` branches, not yet on `main`)* Admin UI — Dashboard, listing pages, scan detail, diff, request-a-quote, settings. Optional. |
+| `src/KenticoSentinel.XbyK.Admin` | Admin UI — Dashboard, Scan history, Findings, Scan detail, Compare scans, Request-a-quote, Settings. Optional — headless deploys can skip it. |
 | `src/KenticoSentinel` | CLI tool (`sentinel`). |
 | `tests/KenticoSentinel.Tests` | xUnit tests across all packages. |
 
