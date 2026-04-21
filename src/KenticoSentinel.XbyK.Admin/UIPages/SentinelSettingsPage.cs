@@ -56,7 +56,10 @@ public class SentinelSettingsPage(IOptions<SentinelOptions> options) : Page<Sett
             : QuoteClient.DefaultEndpoint;
         properties.ContactIncludeContextByDefault = opts.Contact.IncludeContextByDefault;
 
-        properties.ScheduledTasksUrl = "/admin/scheduledtasks";
+        // See SentinelDashboardPage.PopulateDashboard for the rationale — Kentico admin's
+        // Scheduled Tasks deep-link changes across refreshes; linking to the admin root keeps
+        // the instructional copy accurate across versions.
+        properties.ScheduledTasksUrl = "/admin";
 
         return Task.FromResult(properties);
     }

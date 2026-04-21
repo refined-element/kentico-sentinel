@@ -111,6 +111,18 @@ public class SentinelScanDetailPage(
                         Message = "Invalid snooze date — expected ISO-8601 round-trip format.",
                     });
                 }
+                // Reject past / effectively-immediate snooze times. The finding would persist as
+                // Snoozed and then read back as Active on the very next refresh (ToAck treats an
+                // expired snooze as Active), giving the admin misleading "Snoozed" feedback for
+                // something that's already un-snoozed. One-minute grace covers clock drift.
+                if (until <= DateTime.UtcNow.AddMinutes(1))
+                {
+                    return ResponseFrom(new AckMutationResponse
+                    {
+                        Success = false,
+                        Message = "Snooze date must be at least one minute in the future.",
+                    });
+                }
                 ackService.Snooze(data.Fingerprint, until, userId, data.Note);
                 break;
             case "revoke":

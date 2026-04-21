@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { usePageCommand } from '@kentico/xperience-admin-base';
-import { Button, ButtonColor, ButtonSize } from '@kentico/xperience-admin-components';
+import { Button, ButtonColor, ButtonSize, ButtonType } from '@kentico/xperience-admin-components';
 
 interface ScanOption {
     readonly runId: number;
@@ -95,8 +95,11 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
     const [filter, setFilter] = useState<'all' | 'active' | 'acked' | 'snoozed'>('active');
     const [feedback, setFeedback] = useState<string | null>(null);
 
-    const { execute: loadScan, isPending: isLoading } = usePageCommand<ScanDetailResponse, { runId: number }>('LoadScanDetail', {
+    // Kentico's Command<T> only exposes `execute` — track in-flight state locally.
+    const [isLoading, setIsLoading] = useState(false);
+    const { execute: loadScanCmd } = usePageCommand<ScanDetailResponse, { runId: number }>('LoadScanDetail', {
         after: (r) => {
+            setIsLoading(false);
             if (r?.detail) {
                 setDetail(r.detail);
                 setAckStates(
@@ -126,6 +129,8 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
             }
         },
     });
+
+    const loadScan = (args: { runId: number }) => { setIsLoading(true); loadScanCmd(args); };
 
     const onScanChange = (runId: number) => {
         setSelectedRunId(runId);
@@ -483,7 +488,7 @@ const AckActions = ({
     if (ackState !== 'Active') {
         return (
             <Button
-                type="button"
+                type={ButtonType.Button}
                 label="Revoke"
                 size={ButtonSize.S}
                 color={ButtonColor.Secondary}
@@ -496,14 +501,14 @@ const AckActions = ({
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', gap: 6 }}>
                 <Button
-                    type="button"
+                    type={ButtonType.Button}
                     label="Acknowledge"
                     size={ButtonSize.S}
                     color={ButtonColor.Secondary}
                     onClick={() => onMutate({ fingerprint, action: 'acknowledge', note: note.trim() || undefined })}
                 />
                 <Button
-                    type="button"
+                    type={ButtonType.Button}
                     label={snoozeOpen ? 'Cancel' : 'Snooze'}
                     size={ButtonSize.S}
                     color={ButtonColor.Secondary}
@@ -544,7 +549,7 @@ const AckActions = ({
                         style={{ padding: '4px 8px', border: `1px solid ${COLORS.border}`, borderRadius: 4, fontSize: 12 }}
                     />
                     <Button
-                        type="button"
+                        type={ButtonType.Button}
                         label={`Snooze ${snoozeDays}d`}
                         size={ButtonSize.S}
                         color={ButtonColor.Primary}

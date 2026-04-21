@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePageCommand } from '@kentico/xperience-admin-base';
-import { Button, ButtonColor, ButtonSize } from '@kentico/xperience-admin-components';
+import { Button, ButtonColor, ButtonSize, ButtonType } from '@kentico/xperience-admin-components';
 
 // Keep this file server-contract-shaped: the exported interfaces mirror
 // SentinelDashboardPage.DashboardClientProperties on the C# side. If you add a
@@ -78,30 +78,38 @@ export const DashboardTemplate = (initial: DashboardClientProperties) => {
     const [data, setData] = useState<DashboardClientProperties>(initial);
     const [runNowFeedback, setRunNowFeedback] = useState<{ tone: 'success' | 'error'; text: string } | null>(null);
 
-    const { execute: refresh, isPending: isRefreshing } =
-        usePageCommand<DashboardRefreshResult>('GetDashboardData', {
-            after: (result) => {
-                if (result?.data) {
-                    setData(result.data);
-                }
-            },
-        });
+    // Kentico's Command<T> only exposes `execute` — no built-in pending flag. Track in-flight
+    // state locally via useState; wrap execute in handlers that toggle around the call so the
+    // buttons disable each other and the "…ing" labels work.
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [isRunning, setIsRunning] = useState(false);
 
-    const { execute: runNow, isPending: isRunning } =
-        usePageCommand<RunNowResult>('RunScanNow', {
-            after: (result) => {
-                if (!result) return;
-                setRunNowFeedback({
-                    tone: result.success ? 'success' : 'error',
-                    text: result.message,
-                });
-                // Auto-refresh the dashboard when a manual scan succeeded so the new scan-row
-                // lands at the top of the "Recent scans" list without a page reload.
-                if (result.success) {
-                    refresh();
-                }
-            },
-        });
+    const { execute: refreshCmd } = usePageCommand<DashboardRefreshResult>('GetDashboardData', {
+        after: (result) => {
+            setIsRefreshing(false);
+            if (result?.data) {
+                setData(result.data);
+            }
+        },
+    });
+    const refresh = () => { setIsRefreshing(true); refreshCmd(); };
+
+    const { execute: runNowCmd } = usePageCommand<RunNowResult>('RunScanNow', {
+        after: (result) => {
+            setIsRunning(false);
+            if (!result) return;
+            setRunNowFeedback({
+                tone: result.success ? 'success' : 'error',
+                text: result.message,
+            });
+            // Auto-refresh the dashboard when a manual scan succeeded so the new scan-row
+            // lands at the top of the "Recent scans" list without a page reload.
+            if (result.success) {
+                refresh();
+            }
+        },
+    });
+    const runNow = () => { setIsRunning(true); runNowCmd(); };
 
     if (!data.hasScans) {
         return <EmptyState scheduledTasksUrl={data.scheduledTasksUrl} onRunNow={() => runNow()} isRunning={isRunning} runNowFeedback={runNowFeedback} />;
@@ -120,7 +128,7 @@ export const DashboardTemplate = (initial: DashboardClientProperties) => {
                 </div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                     <Button
-                        type="button"
+                        type={ButtonType.Button}
                         label={isRunning ? 'Running…' : 'Run scan now'}
                         onClick={() => { setRunNowFeedback(null); runNow(); }}
                         size={ButtonSize.S}
@@ -128,7 +136,7 @@ export const DashboardTemplate = (initial: DashboardClientProperties) => {
                         disabled={isRunning || isRefreshing}
                     />
                     <Button
-                        type="button"
+                        type={ButtonType.Button}
                         label={isRefreshing ? 'Refreshing…' : 'Refresh'}
                         onClick={() => refresh()}
                         size={ButtonSize.S}
@@ -184,7 +192,7 @@ const EmptyState = ({
         </p>
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
             <Button
-                type="button"
+                type={ButtonType.Button}
                 label={isRunning ? 'Running first scan…' : 'Run scan now'}
                 onClick={onRunNow}
                 size={ButtonSize.M}

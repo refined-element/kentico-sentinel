@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { usePageCommand } from '@kentico/xperience-admin-base';
-import { Button, ButtonColor, ButtonSize } from '@kentico/xperience-admin-components';
+import { Button, ButtonColor, ButtonSize, ButtonType } from '@kentico/xperience-admin-components';
 
 interface ScanOption {
     readonly runId: number;
@@ -52,11 +52,15 @@ export const DiffTemplate = (initial: DiffClientProperties) => {
     const [afterId, setAfterId] = useState<number>(initial.defaultAfterRunId);
     const [diff, setDiff] = useState<DiffResponse | null>(null);
 
-    const { execute, isPending } = usePageCommand<DiffResponse, { beforeRunId: number; afterRunId: number }>('ComputeDiff', {
+    // Kentico's Command<T> only exposes `execute` — track in-flight state with local useState.
+    const [isPending, setIsPending] = useState(false);
+    const { execute: runDiff } = usePageCommand<DiffResponse, { beforeRunId: number; afterRunId: number }>('ComputeDiff', {
         after: (r) => {
+            setIsPending(false);
             if (r) setDiff(r);
         },
     });
+    const execute = (args: { beforeRunId: number; afterRunId: number }) => { setIsPending(true); runDiff(args); };
 
     // Auto-compute on first mount so the user sees a diff without having to click — uses the
     // server's default selections (latest vs. previous). They can change the pickers after.
@@ -140,7 +144,7 @@ export const DiffTemplate = (initial: DiffClientProperties) => {
                     </select>
                 </div>
                 <Button
-                    type="button"
+                    type={ButtonType.Button}
                     label={isPending ? 'Comparing…' : 'Compare'}
                     onClick={() => execute({ beforeRunId: beforeId, afterRunId: afterId })}
                     size={ButtonSize.M}

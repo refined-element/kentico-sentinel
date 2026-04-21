@@ -111,7 +111,10 @@ public class SentinelDashboardPage(
 
     private void PopulateDashboard(DashboardClientProperties properties)
     {
-        properties.ScheduledTasksUrl = "/admin/scheduledtasks";
+        // Kentico admin deep-link paths vary by refresh and app-identifier convention; a
+        // hardcoded link to Scheduled Tasks would go stale across versions. Send admins to the
+        // admin root — the left-nav chrome resolves the "Scheduled tasks" entry correctly.
+        properties.ScheduledTasksUrl = "/admin";
         properties.ScanHistoryUrl = "/admin/sentinel/scans";
         properties.FindingsUrl = "/admin/sentinel/findings";
 

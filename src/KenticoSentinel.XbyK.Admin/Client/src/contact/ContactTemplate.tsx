@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePageCommand } from '@kentico/xperience-admin-base';
-import { Button, ButtonColor, ButtonSize } from '@kentico/xperience-admin-components';
+import { Button, ButtonColor, ButtonSize, ButtonType } from '@kentico/xperience-admin-components';
 
 // Contact form → Refined Element quote intake. Payload mirrors
 // SentinelContactPage.ContactSubmitData on the C# side; keep in sync on changes.
@@ -77,8 +77,12 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
     );
     const [result, setResult] = useState<SubmitResult | null>(null);
 
-    const { execute, isPending } = usePageCommand<SubmitResult, SubmitData>('SubmitContact', {
+    // Kentico's Command<T> only exposes `execute` — no built-in pending flag. Track in-flight
+    // state with a local useState; toggle true around the execute call and false in `after`.
+    const [isPending, setIsPending] = useState(false);
+    const { execute } = usePageCommand<SubmitResult, SubmitData>('SubmitContact', {
         after: (r) => {
+            setIsPending(false);
             if (r) {
                 setResult(r);
                 // Clear the form on success so the admin doesn't accidentally re-submit by
@@ -99,6 +103,7 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
     const submitQuote = () => {
         if (!canSubmit || scanRunId === null) return;
         setResult(null);
+        setIsPending(true);
         execute({
             scanRunId,
             contactEmail: email.trim(),
@@ -231,7 +236,7 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     <Button
-                        type="button"
+                        type={ButtonType.Button}
                         label={isPending ? 'Sending…' : 'Request quote'}
                         onClick={submitQuote}
                         size={ButtonSize.M}

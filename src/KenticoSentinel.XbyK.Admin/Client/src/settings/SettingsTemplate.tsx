@@ -108,7 +108,11 @@ export const SettingsTemplate = (props: SettingsClientProperties) => (
                     <a href={props.scheduledTasksUrl} style={{ color: COLORS.limeDark, fontWeight: 600 }}>
                         Scheduled tasks
                     </a>
-                    {' — not an <code>appsettings</code> value. Edit the <code>RefinedElement.SentinelScan</code> row.'}
+                    {' — not an '}
+                    <code>appsettings</code>
+                    {' value. Edit the '}
+                    <code>RefinedElement.SentinelScan</code>
+                    {' row.'}
                 </li>
             </ul>
         </div>

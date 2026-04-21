@@ -4,8 +4,9 @@
   "private": true,
   "description": "React client for the Kentico Sentinel admin UI (Dashboard + Contact form).",
   "scripts": {
-    "build": "webpack --mode production",
-    "build:dev": "webpack --mode development",
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && webpack --mode production",
+    "build:dev": "tsc --noEmit && webpack --mode development",
     "watch": "webpack --mode development --watch"
   },
   "dependencies": {
