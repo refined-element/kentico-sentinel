@@ -38,6 +38,8 @@ interface FindingDetail {
     readonly remediationTitle: string | null;
     readonly remediationSummary: string | null;
     readonly remediationSteps: string | null;
+    readonly scanOccurrences: number;
+    readonly firstSeenUtc: string | null;
 }
 
 interface ScanDetail {
@@ -77,6 +79,14 @@ interface BulkAckResponse {
     readonly affectedCount: number;
     readonly requestedCount: number;
     readonly updates: ReadonlyArray<BulkAckUpdate>;
+}
+
+interface ExportFindingsResponse {
+    readonly success: boolean;
+    readonly message: string;
+    readonly content: string;
+    readonly mimeType: string;
+    readonly fileName: string;
 }
 
 const COLORS = {
@@ -181,6 +191,35 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
 
     const loadScan = (args: { runId: number }) => { setIsLoading(true); loadScanCmd(args); };
 
+    const { execute: exportCmd } = usePageCommand<ExportFindingsResponse, { runId: number; format: string }>('ExportFindings', {
+        after: (r) => {
+            if (!r?.success) {
+                setFeedback(r?.message || 'Export failed.');
+                window.setTimeout(() => setFeedback(null), 4000);
+                return;
+            }
+            // Create a blob + transient anchor to trigger the browser's Save-As flow. Revoking
+            // the object URL on the next tick avoids leaking memory while guaranteeing the
+            // download has been handed off to the browser's download manager.
+            const blob = new Blob([r.content], { type: r.mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = r.fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            window.setTimeout(() => URL.revokeObjectURL(url), 0);
+            setFeedback(r.message);
+            window.setTimeout(() => setFeedback(null), 4000);
+        },
+    });
+
+    const onExport = (format: 'csv' | 'json') => {
+        if (selectedRunId == null) return;
+        exportCmd({ runId: selectedRunId, format });
+    };
+
     const onScanChange = (runId: number) => {
         setSelectedRunId(runId);
         loadScan({ runId });
@@ -269,6 +308,24 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
                                 </option>
                             ))}
                         </select>
+                    </div>
+                    <div style={{ display: 'flex', gap: 6 }}>
+                        <Button
+                            type={ButtonType.Button}
+                            label="Export CSV"
+                            size={ButtonSize.S}
+                            color={ButtonColor.Secondary}
+                            disabled={selectedRunId == null}
+                            onClick={() => onExport('csv')}
+                        />
+                        <Button
+                            type={ButtonType.Button}
+                            label="Export JSON"
+                            size={ButtonSize.S}
+                            color={ButtonColor.Secondary}
+                            disabled={selectedRunId == null}
+                            onClick={() => onExport('json')}
+                        />
                     </div>
                 </div>
             </header>
@@ -636,6 +693,7 @@ const FindingRow = ({
                         <code style={{ color: COLORS.textPrimary, fontWeight: 700 }}>{finding.ruleId}</code>
                         <span style={{ color: COLORS.textPrimary, fontWeight: 500 }}>{finding.ruleTitle}</span>
                         <AckBadge state={ackState} until={snoozeUntil} />
+                        <AgeBadge scanCount={finding.scanOccurrences} firstSeenUtc={finding.firstSeenUtc} />
                     </div>
                     <div style={{ color: COLORS.textMuted, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
                         {finding.message}
@@ -736,6 +794,47 @@ const AckBadge = ({ state, until }: { state: string; until: string | null }) => 
             }}
         >
             {isSnooze && until ? `Snoozed until ${new Date(until).toLocaleDateString()}` : 'Acknowledged'}
+        </span>
+    );
+};
+
+// "New" vs "seen in N scans, first X ago" triage chip. Operator values: new = fresh regression,
+// worth investigating; long-running = known/accepted debt, ack candidate. Hidden for the one
+// case that matters but isn't interesting — single-occurrence findings in a first-time install.
+const AgeBadge = ({ scanCount, firstSeenUtc }: { scanCount: number; firstSeenUtc: string | null }) => {
+    if (scanCount <= 1 || !firstSeenUtc) {
+        return (
+            <span
+                style={{
+                    fontSize: 11,
+                    padding: '2px 8px',
+                    borderRadius: 10,
+                    background: '#DCFCE7',
+                    color: '#15803D',
+                    fontWeight: 600,
+                }}
+                title="First appeared in this scan"
+            >
+                NEW
+            </span>
+        );
+    }
+    const firstSeen = new Date(firstSeenUtc);
+    const days = Math.max(1, Math.round((Date.now() - firstSeen.getTime()) / (1000 * 60 * 60 * 24)));
+    const age = days < 7 ? `${days}d` : days < 30 ? `${Math.round(days / 7)}w` : days < 365 ? `${Math.round(days / 30)}mo` : `${Math.round(days / 365)}y`;
+    return (
+        <span
+            style={{
+                fontSize: 11,
+                padding: '2px 8px',
+                borderRadius: 10,
+                background: '#F1F5F9',
+                color: '#475569',
+                fontWeight: 600,
+            }}
+            title={`Seen in ${scanCount} scans, first detected ${firstSeen.toLocaleDateString()}`}
+        >
+            {scanCount}× · {age} old
         </span>
     );
 };

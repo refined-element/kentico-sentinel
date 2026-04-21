@@ -125,6 +125,10 @@ public class SentinelDashboardPage(
 
         properties.HasScans = recent.Count > 0;
         properties.LatestScan = recent.Count > 0 ? ToSummary(recent[0]) : null;
+        // PreviousScan powers the delta chips on the KPI tiles — "+3 errors since last scan"
+        // reads at a glance whether the scan trended in the right direction. Only populated when
+        // there's an actual earlier scan to compare against.
+        properties.PreviousScan = recent.Count > 1 ? ToSummary(recent[1]) : null;
         properties.RecentScans = recent.Select(ToSummary).ToArray();
         properties.Trend = ComputeTrend();
 
@@ -253,6 +257,7 @@ public sealed class DashboardClientProperties : TemplateClientProperties
 {
     public bool HasScans { get; set; }
     public ScanSummaryDto? LatestScan { get; set; }
+    public ScanSummaryDto? PreviousScan { get; set; }
     public ScanSummaryDto[] RecentScans { get; set; } = Array.Empty<ScanSummaryDto>();
     public RuleCountDto[] TopRules { get; set; } = Array.Empty<RuleCountDto>();
     public TrendPointDto[] Trend { get; set; } = Array.Empty<TrendPointDto>();

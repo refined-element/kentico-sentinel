@@ -72,6 +72,90 @@ public class SentinelScanDetailPage(
     }
 
     /// <summary>
+    /// Returns the current scan's findings serialized as CSV or JSON. The client triggers a
+    /// browser download after receiving the payload — keeps the admin shell inside its page
+    /// boundary (no cross-origin file endpoint to configure) at the cost of holding the blob
+    /// in memory briefly on the client. Worth it for scans under ~1000 findings; above that,
+    /// admins typically query the RefinedElement_SentinelFinding table directly anyway.
+    /// </summary>
+    [PageCommand]
+    public async Task<ICommandResponse<ExportFindingsResponse>> ExportFindings(ExportFindingsData data)
+    {
+        var detail = await BuildDetail(data.RunId);
+        if (detail.Run is null)
+        {
+            return ResponseFrom(new ExportFindingsResponse { Success = false, Message = "Scan not found." });
+        }
+
+        var format = (data.Format ?? "csv").Trim().ToLowerInvariant();
+        string content;
+        string mimeType;
+        string extension;
+
+        switch (format)
+        {
+            case "csv":
+                content = RenderCsv(detail);
+                mimeType = "text/csv";
+                extension = "csv";
+                break;
+            case "json":
+                content = System.Text.Json.JsonSerializer.Serialize(detail, new System.Text.Json.JsonSerializerOptions
+                {
+                    PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.CamelCase,
+                    WriteIndented = true,
+                });
+                mimeType = "application/json";
+                extension = "json";
+                break;
+            default:
+                return ResponseFrom(new ExportFindingsResponse
+                {
+                    Success = false,
+                    Message = $"Unknown format '{format}'. Supported: csv, json.",
+                });
+        }
+
+        return ResponseFrom(new ExportFindingsResponse
+        {
+            Success = true,
+            Content = content,
+            MimeType = mimeType,
+            FileName = $"sentinel-scan-{detail.Run.RunId}.{extension}",
+            Message = $"Exported {detail.Findings.Length} finding{(detail.Findings.Length == 1 ? string.Empty : "s")}.",
+        });
+    }
+
+    private static string RenderCsv(ScanDetailDto detail)
+    {
+        // Minimal CSV: one row per finding with the columns operators actually share externally.
+        // RFC 4180 quoting: double every embedded quote, wrap fields that contain commas / quotes
+        // / newlines. Keep the format readable without a library dependency.
+        var sb = new System.Text.StringBuilder(16 * 1024);
+        sb.AppendLine("ScanRunId,Severity,RuleId,RuleTitle,Category,Message,Location,AckState,SnoozeUntilUtc,ScanOccurrences,FirstSeenUtc");
+        foreach (var f in detail.Findings)
+        {
+            sb.Append(detail.Run!.RunId).Append(',');
+            sb.Append(Csv(f.Severity)).Append(',');
+            sb.Append(Csv(f.RuleId)).Append(',');
+            sb.Append(Csv(f.RuleTitle)).Append(',');
+            sb.Append(Csv(f.Category)).Append(',');
+            sb.Append(Csv(f.Message)).Append(',');
+            sb.Append(Csv(f.Location ?? string.Empty)).Append(',');
+            sb.Append(Csv(f.AckState)).Append(',');
+            sb.Append(Csv(f.SnoozeUntilUtc ?? string.Empty)).Append(',');
+            sb.Append(f.ScanOccurrences).Append(',');
+            sb.AppendLine(Csv(f.FirstSeenUtc ?? string.Empty));
+        }
+        return sb.ToString();
+    }
+
+    private static string Csv(string value) =>
+        value.IndexOfAny(new[] { ',', '"', '\n', '\r' }) >= 0
+            ? "\"" + value.Replace("\"", "\"\"") + "\""
+            : value;
+
+    /// <summary>
     /// Bulk variant of <see cref="SetAckState"/>. Applies the same action + note to every
     /// fingerprint in the payload. Returns per-fingerprint updated state so the client can patch
     /// its per-row ack chips without reloading the whole scan. Noisy checks (CNT006 event-log
@@ -268,10 +352,17 @@ public class SentinelScanDetailPage(
 
         var acks = ackService.GetAll(findings.Select(f => f.SentinelFindingFingerprintHash));
 
+        // Cross-scan history — for each fingerprint in this scan, count how many other scans it
+        // appears in and when it was first detected. Lets the admin triage "this has been open
+        // for 3 weeks across 8 scans" vs "new in this run" at a glance. One query pre-computed
+        // so the per-row loop is O(1) lookup.
+        var history = BuildFingerprintHistory(findings.Select(f => f.SentinelFindingFingerprintHash).ToArray());
+
         var findingDtos = findings.Select(f =>
         {
             var ackState = acks.TryGetValue(f.SentinelFindingFingerprintHash, out var a) ? a : null;
             var remediation = RemediationGuide.TryFor(f.SentinelFindingRuleID);
+            history.TryGetValue(f.SentinelFindingFingerprintHash, out var hist);
             return new FindingDetailDto
             {
                 FindingId = f.SentinelFindingID,
@@ -290,6 +381,8 @@ public class SentinelScanDetailPage(
                 RemediationTitle = remediation?.Title,
                 RemediationSummary = remediation?.Summary,
                 RemediationSteps = remediation?.Steps,
+                ScanOccurrences = hist.ScanCount,
+                FirstSeenUtc = hist.FirstSeenUtc,
             };
         }).ToArray();
 
@@ -320,6 +413,58 @@ public class SentinelScanDetailPage(
         Run = null,
         Findings = Array.Empty<FindingDetailDto>(),
     };
+
+    /// <summary>
+    /// For each fingerprint in the input, return the total number of scan runs it has appeared
+    /// in and the earliest scan-start timestamp. Pre-computed with a single query so the
+    /// per-finding render loop stays O(1) — querying per-finding would be N round-trips and on
+    /// a scan with 500 findings that's a visible freeze.
+    /// </summary>
+    private Dictionary<string, FingerprintHistory> BuildFingerprintHistory(string[] fingerprints)
+    {
+        if (fingerprints.Length == 0)
+        {
+            return new Dictionary<string, FingerprintHistory>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        // Pull every finding that shares any of these fingerprints, along with its scan-run
+        // start time. Grouping happens in memory because Kentico's ObjectQuery doesn't expose
+        // GROUP BY on the IInfoProvider<T> surface — but the JOIN via scan-run ID is cheap
+        // because we fetch only the columns we aggregate on.
+        var rows = findingProvider.Get()
+            .WhereIn(nameof(SentinelFindingInfo.SentinelFindingFingerprintHash), fingerprints)
+            .Columns(
+                nameof(SentinelFindingInfo.SentinelFindingFingerprintHash),
+                nameof(SentinelFindingInfo.SentinelFindingScanRunID))
+            .ToList();
+
+        var scanIds = rows.Select(r => r.SentinelFindingScanRunID).Distinct().ToArray();
+        var scanStartTimes = scanRunProvider.Get()
+            .WhereIn(nameof(SentinelScanRunInfo.SentinelScanRunID), scanIds)
+            .Columns(
+                nameof(SentinelScanRunInfo.SentinelScanRunID),
+                nameof(SentinelScanRunInfo.SentinelScanRunStartedAt))
+            .ToList()
+            .ToDictionary(r => r.SentinelScanRunID, r => r.SentinelScanRunStartedAt);
+
+        return rows
+            .GroupBy(r => r.SentinelFindingFingerprintHash, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var scanIdSet = g.Select(r => r.SentinelFindingScanRunID).Distinct().ToArray();
+                    var firstSeen = scanIdSet
+                        .Select(id => scanStartTimes.TryGetValue(id, out var t) ? t : DateTime.MaxValue)
+                        .Min();
+                    return new FingerprintHistory(
+                        ScanCount: scanIdSet.Length,
+                        FirstSeenUtc: DateTime.SpecifyKind(firstSeen, DateTimeKind.Utc).ToString("O"));
+                },
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    private readonly record struct FingerprintHistory(int ScanCount, string FirstSeenUtc);
 }
 
 public sealed class ScanDetailClientProperties : TemplateClientProperties
@@ -358,6 +503,25 @@ public sealed class FindingDetailDto
     public string? RemediationTitle { get; set; }
     public string? RemediationSummary { get; set; }
     public string? RemediationSteps { get; set; }
+    /// <summary>Total distinct scan runs this fingerprint has appeared in (includes the current one).</summary>
+    public int ScanOccurrences { get; set; }
+    /// <summary>ISO-8601 UTC timestamp of the earliest scan run that produced this fingerprint.</summary>
+    public string? FirstSeenUtc { get; set; }
+}
+
+public sealed class ExportFindingsData
+{
+    public int RunId { get; set; }
+    public string Format { get; set; } = "csv"; // "csv" | "json"
+}
+
+public sealed class ExportFindingsResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public string Content { get; set; } = string.Empty;
+    public string MimeType { get; set; } = string.Empty;
+    public string FileName { get; set; } = string.Empty;
 }
 
 public sealed class LoadScanDetailData

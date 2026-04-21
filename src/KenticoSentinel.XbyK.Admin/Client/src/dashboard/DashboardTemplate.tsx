@@ -38,6 +38,7 @@ interface TrendPoint {
 interface DashboardClientProperties {
     readonly hasScans: boolean;
     readonly latestScan: ScanSummary | null;
+    readonly previousScan: ScanSummary | null;
     readonly recentScans: ReadonlyArray<ScanSummary>;
     readonly topRules: ReadonlyArray<RuleCount>;
     readonly trend: ReadonlyArray<TrendPoint>;
@@ -148,7 +149,7 @@ export const DashboardTemplate = (initial: DashboardClientProperties) => {
 
             {runNowFeedback && <FeedbackBanner tone={runNowFeedback.tone} text={runNowFeedback.text} onDismiss={() => setRunNowFeedback(null)} />}
 
-            <KpiRow scan={data.latestScan} />
+            <KpiRow scan={data.latestScan} previous={data.previousScan} />
 
             <Panel title="30-day severity trend" style={{ marginTop: 24 }}>
                 <TrendChart trend={data.trend} />
@@ -252,32 +253,71 @@ const FeedbackBanner = ({ tone, text, onDismiss }: { tone: 'success' | 'error'; 
     </div>
 );
 
-const KpiRow = ({ scan }: { scan: ScanSummary | null }) => {
+const KpiRow = ({ scan, previous }: { scan: ScanSummary | null; previous: ScanSummary | null }) => {
     if (!scan) return null;
+    // For severity tiles (Errors/Warnings/Info) a DECREASE is a good thing, so we invert the
+    // delta tone — dropping errors should read green, adding errors red. Total is tone-neutral
+    // since "more findings" could mean the scanner got smarter, not the site got worse.
     return (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16 }}>
-            <KpiTile label="Total findings" value={scan.totalFindings} />
-            <KpiTile label="Errors" value={scan.errorCount} color={scan.errorCount > 0 ? COLORS.error : COLORS.info} />
-            <KpiTile label="Warnings" value={scan.warningCount} color={scan.warningCount > 0 ? COLORS.warning : COLORS.info} />
-            <KpiTile label="Info" value={scan.infoCount} color={COLORS.info} />
+            <KpiTile label="Total findings" value={scan.totalFindings} delta={delta(scan.totalFindings, previous?.totalFindings)} deltaInvertTone />
+            <KpiTile label="Errors" value={scan.errorCount} color={scan.errorCount > 0 ? COLORS.error : COLORS.info} delta={delta(scan.errorCount, previous?.errorCount)} deltaInvertTone />
+            <KpiTile label="Warnings" value={scan.warningCount} color={scan.warningCount > 0 ? COLORS.warning : COLORS.info} delta={delta(scan.warningCount, previous?.warningCount)} deltaInvertTone />
+            <KpiTile label="Info" value={scan.infoCount} color={COLORS.info} delta={delta(scan.infoCount, previous?.infoCount)} deltaInvertTone />
         </div>
     );
 };
 
-const KpiTile = ({ label, value, color = COLORS.textPrimary }: { label: string; value: number; color?: string }) => (
-    <div
-        style={{
-            padding: 20,
-            background: COLORS.bg,
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 10,
-            borderLeft: `4px solid ${color}`,
-        }}
-    >
-        <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 6 }}>{label}</div>
-        <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
-    </div>
-);
+const delta = (current: number, previous: number | undefined): number | null =>
+    previous === undefined || previous === null ? null : current - previous;
+
+const KpiTile = ({
+    label,
+    value,
+    color = COLORS.textPrimary,
+    delta,
+    deltaInvertTone,
+}: {
+    label: string;
+    value: number;
+    color?: string;
+    delta?: number | null;
+    deltaInvertTone?: boolean;
+}) => {
+    const hasDelta = delta !== null && delta !== undefined;
+    // For severity counts, decreasing is good (green), increasing is bad (red). Total is
+    // tone-neutral — report only direction and count, no color load.
+    const deltaColor = !hasDelta || delta === 0
+        ? COLORS.textMuted
+        : (delta! > 0) === !!deltaInvertTone
+            ? COLORS.success
+            : COLORS.error;
+    const sign = !hasDelta ? '' : delta! > 0 ? '+' : delta! < 0 ? '−' : '±';
+    return (
+        <div
+            style={{
+                padding: 20,
+                background: COLORS.bg,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 10,
+                borderLeft: `4px solid ${color}`,
+            }}
+        >
+            <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 6 }}>{label}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
+                {hasDelta && (
+                    <div
+                        style={{ fontSize: 13, color: deltaColor, fontWeight: 600 }}
+                        title="Change since the previous scan"
+                    >
+                        {sign}{Math.abs(delta!).toLocaleString()}
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 const Panel = ({
     title,
