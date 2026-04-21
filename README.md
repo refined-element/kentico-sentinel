@@ -83,6 +83,7 @@ Cadence lives in Kentico's Scheduled Tasks UI — no cron config in code.
 
 - **`RefinedElement_SentinelScanRun`** — one row per scan execution (trigger, duration, error/warning/info counts, status)
 - **`RefinedElement_SentinelFinding`** — one row per finding with a stable fingerprint for cross-scan acknowledgments
+- **`RefinedElement_SentinelFindingAck`** — one row per acknowledged/snoozed finding, keyed by fingerprint. The installer provisions the table so deploys don't need a migration step when the Admin UI (v0.3.x) lights up the ack actions; it stays empty until then.
 - **`CMS_EventLog`** — summary entry per scan (source = `Sentinel`) + one entry per finding at or above `SeverityThreshold`, up to `EventLogIntegration.MaxEntriesPerScan`; if more findings qualify, Sentinel writes a single additional summary noting the suppressed event-log entries
 
 ### 6. Admin UI *(preview — v0.3.0-alpha in active review on the `feat/admin-ui*` branches)*
