@@ -95,6 +95,33 @@ public class AdminRegistrationTests
     }
 
     [Fact]
+    public void Dashboard_page_is_first_in_nav_order_and_uses_custom_template()
+    {
+        var page = AdminAssembly.GetCustomAttributes<UIPageAttribute>()
+            .Single(p => p.Type == typeof(SentinelDashboardPage));
+
+        Assert.Equal(typeof(SentinelApplicationPage), page.ParentType);
+        Assert.Equal("dashboard", page.Slug);
+        // Dashboard must be first so it's the default destination when an admin clicks the
+        // Sentinel nav entry. Listing pages are First (100) and 200; dashboard takes First - 1.
+        Assert.True(page.Order < UIPageOrder.First);
+        // Custom React template name — must begin "@<orgName>/<projectName>/" to resolve to the
+        // client bundle. Drift from the csproj or webpack orgName/projectName = blank page.
+        Assert.Equal("@refinedelement/sentinel-admin/Dashboard", page.TemplateName);
+    }
+
+    [Fact]
+    public void Contact_page_registers_with_custom_template()
+    {
+        var page = AdminAssembly.GetCustomAttributes<UIPageAttribute>()
+            .Single(p => p.Type == typeof(SentinelContactPage));
+
+        Assert.Equal(typeof(SentinelApplicationPage), page.ParentType);
+        Assert.Equal("contact", page.Slug);
+        Assert.Equal("@refinedelement/sentinel-admin/Contact", page.TemplateName);
+    }
+
+    [Fact]
     public void Sentinel_listing_pages_are_siblings_under_the_same_parent()
     {
         var parents = AdminAssembly.GetCustomAttributes<UIPageAttribute>()

@@ -13,12 +13,21 @@
     <Version>0.3.0-alpha</Version>
     <Authors>Refined Element</Authors>
     <Company>Refined Element</Company>
-    <Description>Admin UI for Kentico Sentinel. Adds a "Sentinel" application under Configuration in the Kentico admin — listing pages for scan history and findings with filter and sort. Ship alongside RefinedElement.Kentico.Sentinel.XbyK; headless installs that don't want the admin surface can omit this package.</Description>
-    <PackageTags>xperience-by-kentico;xbyk;kentico;admin-ui;scheduled-task;monitoring;health-check</PackageTags>
+    <Description>Admin UI for Kentico Sentinel. Adds a "Sentinel" application under Configuration in the Kentico admin — Dashboard with KPI tiles + recent scans + top rule offenders, Findings listing, Scan history listing, and an in-admin "Request a quote" contact form that submits sanitized scans to Refined Element. Ship alongside RefinedElement.Kentico.Sentinel.XbyK; headless installs that don't want the admin surface can omit this package.</Description>
+    <PackageTags>xperience-by-kentico;xbyk;kentico;admin-ui;dashboard;monitoring;health-check</PackageTags>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/refined-element/kentico-sentinel</PackageProjectUrl>
     <RepositoryUrl>https://github.com/refined-element/kentico-sentinel</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+
+    <!--
+      AdminOrgName identifies the org that publishes this admin client bundle. Combined with the
+      ProjectName on <AdminClientPath> below, it forms the "org-project" key Kentico's admin
+      shell uses to register the module. Must match, verbatim, the same pair of strings in four
+      other places — SentinelAdminModule.RegisterClientModule(...), the webpack config, and the
+      templateName prefix on every [UIPage] attribute. Any drift renders a blank admin page.
+    -->
+    <AdminOrgName>refinedelement</AdminOrgName>
   </PropertyGroup>
 
   <ItemGroup>
@@ -42,10 +51,52 @@
       Kentico's startup attribute scanner only inspects assemblies flagged as discoverable. Without
       this, [UIApplication] and [UIPage] attributes are never discovered and the Sentinel nav entry
       silently fails to appear in admin — same failure mode as the scheduled-task registration bug
-      we fixed in v0.2.1-alpha on the main integration package. Injecting via csproj matches the
-      Lucene admin pattern (no separate AssemblyAttributes.cs to drift).
+      we fixed in v0.2.1-alpha on the main integration package.
     -->
     <AssemblyAttribute Include="CMS.AssemblyDiscoverableAttribute" />
   </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Tells Kentico's embedded-module loader where the compiled React bundle lives. At runtime
+      the admin shell resolves "refinedelement-sentinel-admin" and serves these resources as
+      the SPA's bundle. ProjectName here must match the webpack config's projectName.
+    -->
+    <AdminClientPath Include="Client\dist\**">
+      <ProjectName>sentinel-admin</ProjectName>
+    </AdminClientPath>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!--
+      Keep the client source out of the C# compile set — it lives in its own npm workspace under
+      Client/. Without these Removes, MSBuild would pick up .tsx files (treating them as C#) and
+      node_modules/ would flood the Compile inputs. The bundle output is still consumed via
+      <AdminClientPath> above.
+    -->
+    <None Remove="Client\**" />
+    <Compile Remove="Client\**" />
+    <EmbeddedResource Remove="Client\**" />
+  </ItemGroup>
+
+  <!--
+    Auto-run the client build before the C# compile so `dotnet build` on a fresh clone produces
+    a runnable assembly. Embedded mode reads Client/dist/** via <AdminClientPath> — if that dir
+    is empty, the admin page renders blank at runtime with no actionable error. First build pays
+    the `npm ci` cost; subsequent builds skip it when node_modules/ is already populated.
+
+    Release config => production webpack bundle (minified). Debug config => development bundle
+    (readable sources for in-browser debugging). Both write to Client/dist/.
+  -->
+  <Target Name="SentinelAdminNpmInstall" BeforeTargets="BeforeBuild" Condition="!Exists('Client\node_modules')">
+    <Message Importance="high" Text="Installing Sentinel admin client npm dependencies (first build only)..." />
+    <Exec Command="npm ci" WorkingDirectory="Client" ContinueOnError="false" />
+  </Target>
+
+  <Target Name="SentinelAdminNpmBuildClient" BeforeTargets="BeforeBuild" DependsOnTargets="SentinelAdminNpmInstall">
+    <Message Importance="high" Text="Building Sentinel admin client bundle (mode=$(Configuration))..." />
+    <Exec Command="npm run build" WorkingDirectory="Client" Condition="'$(Configuration)' == 'Release'" ContinueOnError="false" />
+    <Exec Command="npm run build:dev" WorkingDirectory="Client" Condition="'$(Configuration)' != 'Release'" ContinueOnError="false" />
+  </Target>
 
 </Project>
