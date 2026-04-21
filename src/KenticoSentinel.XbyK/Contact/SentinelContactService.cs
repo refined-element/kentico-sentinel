@@ -11,8 +11,8 @@ using RefinedElement.Kentico.Sentinel.XbyK.Configuration;
 namespace RefinedElement.Kentico.Sentinel.XbyK.Contact;
 
 /// <summary>
-/// Typed-HttpClient implementation — the DI container injects the pre-configured client (retry,
-/// base address, user agent, etc. set in <c>SentinelServiceCollectionExtensions</c>). The service
+/// Typed-HttpClient implementation — the DI container injects the pre-configured client (30 s
+/// timeout and user agent set in <c>SentinelServiceCollectionExtensions</c>). The service
 /// layer's job is: resolve the endpoint from <see cref="SentinelOptions.ContactOptions.Endpoint"/>,
 /// POST JSON, translate exceptions into a result object so callers never have to catch
 /// <see cref="HttpRequestException"/> themselves.
@@ -36,9 +36,9 @@ internal sealed class SentinelContactService(
 
         var endpoint = ResolveEndpoint();
         logger.LogInformation(
-            "Sentinel contact: submitting quote for {FindingsCount} findings to {Endpoint}.",
+            "Sentinel contact: submitting quote for {FindingsCount} findings to {Host}.",
             submission.Findings.Count,
-            endpoint);
+            SafeHost(endpoint));
 
         try
         {
@@ -66,12 +66,12 @@ internal sealed class SentinelContactService(
         catch (TaskCanceledException)
         {
             // Distinct from user cancellation: HttpClient timed out (no token cancellation).
-            logger.LogWarning("Sentinel contact: submission timed out against {Endpoint}.", endpoint);
+            logger.LogWarning("Sentinel contact: submission timed out against {Host}.", SafeHost(endpoint));
             return new QuoteResult(false, 0, null, "Request timed out.");
         }
         catch (HttpRequestException ex)
         {
-            logger.LogWarning(ex, "Sentinel contact: submission failed against {Endpoint}.", endpoint);
+            logger.LogWarning(ex, "Sentinel contact: submission failed against {Host}.", SafeHost(endpoint));
             return new QuoteResult(false, 0, null, ex.Message);
         }
     }
@@ -80,4 +80,8 @@ internal sealed class SentinelContactService(
         !string.IsNullOrWhiteSpace(options.Contact.Endpoint)
             ? options.Contact.Endpoint
             : QuoteClient.DefaultEndpoint;
+
+    // Logs only the host to avoid emitting credentials that could appear in a user-configured URL.
+    private static string SafeHost(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) ? uri.Host : "(invalid url)";
 }
