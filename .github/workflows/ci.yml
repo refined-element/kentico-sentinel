@@ -1,0 +1,76 @@
+name: CI
+
+# Runs on every push to main and every PR targeting main. Builds the full solution (Core +
+# XbyK + XbyK.Admin + CLI + tests) and runs xUnit. Catches compile / test regressions before
+# a PR can merge and before a human reviewer has to look. The release workflow still handles
+# packing + publishing on tag push; this one is strictly build-and-test for correctness.
+
+on:
+  push:
+    branches: [main]
+    # Skip when only docs changed — saves CI minutes on README tweaks.
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  pull_request:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build + test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 9
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x'
+
+      # Node is needed for the XbyK.Admin project's MSBuild targets — they invoke `npm ci` +
+      # `npm run build` before the C# compile step. Without node on the runner, the admin
+      # project's pre-build fails and the whole solution build is unbuildable.
+      - name: Setup Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: src/KenticoSentinel.XbyK.Admin/Client/package-lock.json
+
+      # Separate npm cache key from the .NET restore cache so dep changes in one don't invalidate
+      # the other.
+      - name: Restore .NET
+        run: dotnet restore KenticoSentinel.slnx
+
+      # Build in Release to exercise the same webpack mode CI produces for packaging. Admin's
+      # MSBuild NpmInstall + NpmBuildClient targets run as part of this step.
+      - name: Build
+        run: dotnet build KenticoSentinel.slnx --configuration Release --no-restore
+
+      # TypeScript also gets type-checked via `tsc --noEmit` in the admin client's build script
+      # (wired in package.json), but run it explicitly here too so a TS-only failure is flagged
+      # distinctly from a webpack bundle failure.
+      - name: Type-check admin client
+        working-directory: src/KenticoSentinel.XbyK.Admin/Client
+        run: npx tsc --noEmit
+
+      - name: Test
+        run: dotnet test KenticoSentinel.slnx --configuration Release --no-build --verbosity minimal --logger "trx;LogFileName=test-results.trx"
+
+      # Upload test results + admin client bundle so a reviewer can pull the built artifacts
+      # from a failed run if needed.
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: tests/KenticoSentinel.Tests/TestResults/
+          retention-days: 7

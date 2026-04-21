@@ -488,17 +488,16 @@ const TopRulesList = ({ rules }: { rules: ReadonlyArray<RuleCount> }) => {
                                 background: 'transparent',
                                 border: 'none',
                                 textAlign: 'left',
-                                cursor: r.remediationTitle ? 'pointer' : 'default',
+                                cursor: 'pointer',
                                 color: 'inherit',
                                 fontSize: 'inherit',
                                 fontFamily: 'inherit',
                             }}
                             aria-expanded={isOpen}
-                            disabled={!r.remediationTitle}
                         >
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'baseline' }}>
                                 <span style={{ fontFamily: 'monospace', color: COLORS.textPrimary, fontWeight: 600 }}>
-                                    {r.remediationTitle && <span style={{ color: COLORS.limeDark, marginRight: 6 }}>{isOpen ? '▾' : '▸'}</span>}
+                                    <span style={{ color: COLORS.limeDark, marginRight: 6 }}>{isOpen ? '▾' : '▸'}</span>
                                     {r.ruleId}
                                 </span>
                                 <span style={{ color: COLORS.textMuted, fontSize: 12 }}>
@@ -518,10 +517,20 @@ const TopRulesList = ({ rules }: { rules: ReadonlyArray<RuleCount> }) => {
                                 />
                             </div>
                         </button>
-                        {isOpen && r.remediationTitle && (
+                        {isOpen && (
                             <div style={{ padding: '0 20px 16px', fontSize: 13, color: COLORS.textMuted, lineHeight: 1.55 }}>
-                                <div style={{ fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>{r.remediationTitle}</div>
-                                <div style={{ marginBottom: 8 }}>{r.remediationSummary}</div>
+                                {r.remediationTitle && (
+                                    <>
+                                        <div style={{ fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>{r.remediationTitle}</div>
+                                        <div style={{ marginBottom: 8 }}>{r.remediationSummary}</div>
+                                    </>
+                                )}
+                                <a
+                                    href={`/admin/sentinel/scan-detail?rule=${encodeURIComponent(r.ruleId)}`}
+                                    style={{ color: COLORS.limeDark, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}
+                                >
+                                    View {r.activeCount} active finding{r.activeCount === 1 ? '' : 's'} in latest scan →
+                                </a>
                             </div>
                         )}
                     </li>

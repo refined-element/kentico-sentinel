@@ -109,6 +109,13 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
     );
     const [filter, setFilter] = useState<'all' | 'active' | 'acked' | 'snoozed'>('active');
     const [feedback, setFeedback] = useState<string | null>(null);
+    // Free-text search across rule ID / category / message / location. Seeded from the
+    // `?rule=` query param so Dashboard top-rule clicks deep-link into the filtered view.
+    const [search, setSearch] = useState<string>(() => {
+        if (typeof window === 'undefined') return '';
+        const params = new URLSearchParams(window.location.search);
+        return params.get('rule')?.trim() ?? '';
+    });
 
     // Kentico's Command<T> only exposes `execute` — track in-flight state locally.
     const [isLoading, setIsLoading] = useState(false);
@@ -180,15 +187,24 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
     };
 
     const visibleFindings = useMemo(() => {
+        const needle = search.trim().toLowerCase();
         return detail.findings.filter((f) => {
+            // State filter first — cheap O(1) check, usually eliminates the majority of rows.
             const state = ackStates[f.fingerprint]?.ackState ?? f.ackState;
-            if (filter === 'all') return true;
-            if (filter === 'active') return state === 'Active';
-            if (filter === 'acked') return state === 'Acknowledged';
-            if (filter === 'snoozed') return state === 'Snoozed';
-            return true;
+            if (filter === 'active' && state !== 'Active') return false;
+            if (filter === 'acked' && state !== 'Acknowledged') return false;
+            if (filter === 'snoozed' && state !== 'Snoozed') return false;
+            // Search is secondary; only does a scan when a needle is set.
+            if (needle.length === 0) return true;
+            return (
+                f.ruleId.toLowerCase().includes(needle) ||
+                f.category.toLowerCase().includes(needle) ||
+                f.message.toLowerCase().includes(needle) ||
+                (f.location ?? '').toLowerCase().includes(needle) ||
+                f.ruleTitle.toLowerCase().includes(needle)
+            );
         });
-    }, [detail.findings, ackStates, filter]);
+    }, [detail.findings, ackStates, filter, search]);
 
     const byCategory = useMemo(() => {
         const grouped = new Map<string, FindingDetail[]>();
@@ -222,23 +238,38 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
                         </p>
                     )}
                 </div>
-                <div>
-                    <label htmlFor="sentinel-scan-picker" style={{ fontSize: 13, color: COLORS.textMuted, marginRight: 8 }}>
-                        Scan:
-                    </label>
-                    <select
-                        id="sentinel-scan-picker"
-                        value={selectedRunId ?? ''}
-                        onChange={(e) => onScanChange(Number(e.target.value))}
-                        disabled={isLoading}
-                        style={{ padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}
-                    >
-                        {initial.availableScans.map((s) => (
-                            <option key={s.runId} value={s.runId}>
-                                {s.label}
-                            </option>
-                        ))}
-                    </select>
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ position: 'relative' }}>
+                        <label htmlFor="sentinel-scan-search" style={{ position: 'absolute', left: -9999 }}>
+                            Search findings
+                        </label>
+                        <input
+                            id="sentinel-scan-search"
+                            type="search"
+                            placeholder="Search rule / category / message…"
+                            value={search}
+                            onChange={(e) => setSearch(e.target.value)}
+                            style={{ padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13, minWidth: 240 }}
+                        />
+                    </div>
+                    <div>
+                        <label htmlFor="sentinel-scan-picker" style={{ fontSize: 13, color: COLORS.textMuted, marginRight: 8 }}>
+                            Scan:
+                        </label>
+                        <select
+                            id="sentinel-scan-picker"
+                            value={selectedRunId ?? ''}
+                            onChange={(e) => onScanChange(Number(e.target.value))}
+                            disabled={isLoading}
+                            style={{ padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}
+                        >
+                            {initial.availableScans.map((s) => (
+                                <option key={s.runId} value={s.runId}>
+                                    {s.label}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
             </header>
 
