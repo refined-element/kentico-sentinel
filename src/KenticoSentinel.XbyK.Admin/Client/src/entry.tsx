@@ -5,3 +5,6 @@
 // Use named re-exports (not default) because the loader reads them from the module namespace.
 export * from './dashboard/DashboardTemplate';
 export * from './contact/ContactTemplate';
+export * from './settings/SettingsTemplate';
+export * from './scan-detail/ScanDetailTemplate';
+export * from './diff/DiffTemplate';

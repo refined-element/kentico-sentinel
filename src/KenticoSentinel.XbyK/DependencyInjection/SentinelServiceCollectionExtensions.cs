@@ -2,6 +2,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 
+using RefinedElement.Kentico.Sentinel.XbyK.Acknowledgment;
 using RefinedElement.Kentico.Sentinel.XbyK.Configuration;
 using RefinedElement.Kentico.Sentinel.XbyK.Contact;
 using RefinedElement.Kentico.Sentinel.XbyK.Notifications;
@@ -60,6 +61,7 @@ public static class SentinelServiceCollectionExtensions
         services.AddScoped<SentinelScanService>();
         services.AddScoped<ISentinelEventLogWriter, SentinelEventLogWriter>();
         services.AddScoped<ISentinelEmailDigestSender, SentinelEmailDigestSender>();
+        services.AddScoped<ISentinelFindingAckService, SentinelFindingAckService>();
 
         // Typed HttpClient for the Refined Element quote intake. 30s timeout leaves headroom for
         // KDaaS cold-start while still bounding a hung dependency — the admin UI surface is

@@ -2,12 +2,12 @@
   "name": "sentinel-admin",
   "version": "0.3.0",
   "private": true,
-  "description": "React client for the Kentico Sentinel admin UI (Dashboard + Contact form).",
+  "description": "React client for the Kentico Sentinel admin UI (Dashboard, Scan detail, Diff, Settings, Contact form).",
   "scripts": {
-    "build": "webpack --mode production",
-    "build:dev": "webpack --mode development",
-    "watch": "webpack --mode development --watch",
-    "start": "webpack serve --mode development"
+    "typecheck": "tsc --noEmit",
+    "build": "tsc --noEmit && webpack --mode production",
+    "build:dev": "tsc --noEmit && webpack --mode development",
+    "watch": "webpack --mode development --watch"
   },
   "dependencies": {
     "@kentico/xperience-admin-base": "^31.0.0",

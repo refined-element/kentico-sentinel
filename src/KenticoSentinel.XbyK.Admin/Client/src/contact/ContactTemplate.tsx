@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { usePageCommand } from '@kentico/xperience-admin-base';
-import { Button, ButtonColor, ButtonSize } from '@kentico/xperience-admin-components';
+import { Button, ButtonColor, ButtonSize, ButtonType } from '@kentico/xperience-admin-components';
 
 // Contact form → Refined Element quote intake. Payload mirrors
 // SentinelContactPage.ContactSubmitData on the C# side; keep in sync on changes.
@@ -77,8 +77,12 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
     );
     const [result, setResult] = useState<SubmitResult | null>(null);
 
-    const { execute, isPending } = usePageCommand<SubmitResult, SubmitData>('SubmitContact', {
+    // Kentico's Command<T> only exposes `execute` — no built-in pending flag. Track in-flight
+    // state with a local useState; toggle true around the execute call and false in `after`.
+    const [isPending, setIsPending] = useState(false);
+    const { execute } = usePageCommand<SubmitResult, SubmitData>('SubmitContact', {
         after: (r) => {
+            setIsPending(false);
             if (r) {
                 setResult(r);
                 // Clear the form on success so the admin doesn't accidentally re-submit by
@@ -93,10 +97,13 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
 
     const canSubmit = scanRunId !== null && email.trim().length > 0 && !isPending;
 
-    const onSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
+    // Submit path — Kentico's <Button> fires this directly rather than relying on the enclosing
+    // form's native submit, because Button doesn't consistently propagate as type="submit"
+    // across admin versions. The form wrapper is kept for semantics + native Enter-key handling.
+    const submitQuote = () => {
         if (!canSubmit || scanRunId === null) return;
         setResult(null);
+        setIsPending(true);
         execute({
             scanRunId,
             contactEmail: email.trim(),
@@ -105,6 +112,11 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
             message: message.trim(),
             includeContext,
         });
+    };
+
+    const onSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        submitQuote();
     };
 
     if (initial.availableScans.length === 0) {
@@ -141,8 +153,9 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
                     padding: 24,
                 }}
             >
-                <Field label="Scan to reference *">
+                <Field id="sentinel-contact-scan" label="Scan to reference *">
                     <select
+                        id="sentinel-contact-scan"
                         style={inputStyle}
                         value={scanRunId ?? ''}
                         onChange={(e) => setScanRunId(Number(e.target.value))}
@@ -156,8 +169,9 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
                     </select>
                 </Field>
 
-                <Field label="Email *">
+                <Field id="sentinel-contact-email" label="Email *">
                     <input
+                        id="sentinel-contact-email"
                         type="email"
                         style={inputStyle}
                         value={email}
@@ -169,8 +183,9 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
                 </Field>
 
                 <Row>
-                    <Field label="Name">
+                    <Field id="sentinel-contact-name" label="Name">
                         <input
+                            id="sentinel-contact-name"
                             type="text"
                             style={inputStyle}
                             value={name}
@@ -179,8 +194,9 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
                             autoComplete="name"
                         />
                     </Field>
-                    <Field label="Company">
+                    <Field id="sentinel-contact-company" label="Company">
                         <input
+                            id="sentinel-contact-company"
                             type="text"
                             style={inputStyle}
                             value={company}
@@ -191,8 +207,9 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
                     </Field>
                 </Row>
 
-                <Field label="Message">
+                <Field id="sentinel-contact-message" label="Message">
                     <textarea
+                        id="sentinel-contact-message"
                         style={{ ...inputStyle, minHeight: 100, resize: 'vertical' }}
                         value={message}
                         onChange={(e) => setMessage(e.target.value)}
@@ -219,17 +236,14 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
 
                 <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
                     <Button
-                        type="button"
+                        type={ButtonType.Button}
                         label={isPending ? 'Sending…' : 'Request quote'}
-                        onClick={() => { /* form onSubmit handler invoked via native submit */ }}
+                        onClick={submitQuote}
                         size={ButtonSize.M}
                         color={ButtonColor.Primary}
                         disabled={!canSubmit}
                     />
                 </div>
-                {/* Hidden real submit button — Kentico's Button doesn't natively accept type="submit" in
-                    every version, so we back it with a real button and restyle the visible one. */}
-                <button type="submit" disabled={!canSubmit} style={{ display: 'none' }} aria-hidden="true" />
             </form>
 
             {result && <ResultPanel result={result} />}
@@ -241,9 +255,12 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
     );
 };
 
-const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
+// Accessible label/input pairing: the child must use htmlFor={id}, and the input/select/textarea
+// the child is wrapping must carry the matching id. Avoids a div wrapper breaking the label ->
+// for -> id chain and keeps screen readers announcing the field name when the control focuses.
+const Field = ({ id, label, children }: { id: string; label: string; children: React.ReactNode }) => (
     <div style={{ marginBottom: 16 }}>
-        <label style={labelStyle}>{label}</label>
+        <label htmlFor={id} style={labelStyle}>{label}</label>
         {children}
     </div>
 );

@@ -12,7 +12,7 @@ namespace RefinedElement.Kentico.Sentinel.XbyK.Contact;
 
 /// <summary>
 /// Typed-HttpClient implementation — the DI container injects a client whose defaults
-/// (30 s timeout, <c>KenticoSentinel-XbyK</c> user agent) are set in
+/// (30 s timeout, <c>KenticoSentinel-XbyK/{version}</c> user agent) are set in
 /// <c>SentinelServiceCollectionExtensions</c>. The service layer's job is: resolve the endpoint
 /// from <see cref="SentinelOptions.ContactOptions.Endpoint"/>, validate it as an absolute
 /// http(s) URL, POST JSON, translate exceptions into a result object so callers never have to

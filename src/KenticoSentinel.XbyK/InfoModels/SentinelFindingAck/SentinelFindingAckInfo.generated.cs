@@ -58,7 +58,7 @@ public partial class SentinelFindingAckInfo : AbstractInfo<SentinelFindingAckInf
         set => SetValue(nameof(SentinelFindingAckFingerprintHash), value);
     }
 
-    /// <summary>"Acknowledged" | "Dismissed" | "Snoozed".</summary>
+    /// <summary>"Acknowledged" | "Snoozed" — matches <see cref="RefinedElement.Kentico.Sentinel.XbyK.Acknowledgment.AckState"/>; no "Dismissed" state.</summary>
     [DatabaseField]
     public virtual string SentinelFindingAckState
     {
