@@ -23,7 +23,7 @@ public static class RemediationGuide
         ["CFG002"] = new(
             "Fix Kentico middleware ordering",
             "`UseWebOptimizer()` must run AFTER the Kentico trio (`InitKentico → UseStaticFiles → UseKentico`). Kentico Page Builder preview rewrites resource paths with a `/cmsctx/.../-/` prefix; placing WebOptimizer first means it never sees the rewritten paths and bundled CSS returns with empty MIME types.",
-            "Move `app.UseWebOptimizer()` to directly after `app.UseKentico()` in `Program.cs`. See the Kentico middleware pipeline section in the CLAUDE.md for the full correct ordering."),
+            "In `Program.cs`, place the middleware in this exact order: `app.InitKentico();` → `app.UseStaticFiles();` → `app.UseKentico();` → `app.UseWebOptimizer();`. The three Kentico calls must be contiguous with nothing between them, and `UseWebOptimizer()` must come AFTER `UseKentico()`. If you see `UseWebOptimizer()` before `UseKentico()`, move it below and redeploy."),
 
         ["CFG003"] = new(
             "Move plaintext secrets to user-secrets / Key Vault",

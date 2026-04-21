@@ -284,15 +284,19 @@ const KpiTile = ({
     delta?: number | null;
     deltaInvertTone?: boolean;
 }) => {
-    const hasDelta = delta !== null && delta !== undefined;
-    // For severity counts, decreasing is good (green), increasing is bad (red). Total is
-    // tone-neutral — report only direction and count, no color load.
-    const deltaColor = !hasDelta || delta === 0
+    // Hide the chip entirely when there's no previous scan (delta=null) OR no change (delta=0).
+    // Rendering "±0" adds visual noise without conveying anything — an absent chip says
+    // "nothing to highlight here" more clearly than a muted zero.
+    const showDelta = delta !== null && delta !== undefined && delta !== 0;
+    // Severity metrics (deltaInvertTone=true): decrease is good (green), increase is bad (red).
+    // Non-severity metrics (Total findings, etc.) stay neutral — the direction arrow alone
+    // carries the signal without loading color semantics onto it.
+    const deltaColor = !showDelta || !deltaInvertTone
         ? COLORS.textMuted
-        : (delta! > 0) === !!deltaInvertTone
+        : delta! < 0
             ? COLORS.success
             : COLORS.error;
-    const sign = !hasDelta ? '' : delta! > 0 ? '+' : delta! < 0 ? '−' : '±';
+    const sign = !showDelta ? '' : delta! > 0 ? '+' : '−';
     return (
         <div
             style={{
@@ -306,7 +310,7 @@ const KpiTile = ({
             <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 6 }}>{label}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
-                {hasDelta && (
+                {showDelta && (
                     <div
                         style={{ fontSize: 13, color: deltaColor, fontWeight: 600 }}
                         title="Change since the previous scan"

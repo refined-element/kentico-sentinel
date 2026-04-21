@@ -187,7 +187,7 @@ export const DiffTemplate = (initial: DiffClientProperties) => {
 const SummaryRow = ({ diff }: { diff: DiffResponse }) => {
     const delta = diff.introduced.length - diff.resolved.length;
     const tone = delta === 0 ? COLORS.textMuted : delta > 0 ? COLORS.introduced : COLORS.resolved;
-    const label = delta === 0 ? 'No net change' : delta > 0 ? `+${delta} net new` : `${delta} net resolved`;
+    const label = delta === 0 ? 'No net change' : delta > 0 ? `+${delta} net new` : `${Math.abs(delta)} net resolved`;
     return (
         <div
             style={{
