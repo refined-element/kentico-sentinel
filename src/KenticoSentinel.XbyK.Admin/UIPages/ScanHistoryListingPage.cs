@@ -31,12 +31,14 @@ public class ScanHistoryListingPage : ListingPage
 
     public override Task ConfigurePage()
     {
-        // Started-at descending is the natural operator mental model: "what ran most recently?"
-        // Kentico's listing sorts via query param; we set the default so the first page load
-        // already has the most useful order without forcing a click.
+        // Only ONE column carries a default sort so Kentico's listing framework picks the right
+        // default unambiguously. SentinelScanRunID is monotonically increasing with StartedAt
+        // (scan rows are only written by the service, never backdated), so sorting by ID desc
+        // gives the same "newest first" ordering an admin would expect from "Started desc" —
+        // without the ambiguity of two defaultSortDirection declarations.
         PageConfiguration.ColumnConfigurations
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunID), "#", sortable: true, defaultSortDirection: SortTypeEnum.Desc)
-            .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunStartedAt), "Started", sortable: true, defaultSortDirection: SortTypeEnum.Desc)
+            .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunStartedAt), "Started", sortable: true)
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunStatus), "Status", sortable: true, searchable: true)
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunTrigger), "Trigger", sortable: true, searchable: true)
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunTotalFindings), "Total", sortable: true)
