@@ -18,9 +18,11 @@ using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelScanRun;
 namespace RefinedElement.Kentico.Sentinel.XbyK.Admin.UIPages;
 
 /// <summary>
-/// Lists every completed <see cref="SentinelScanRunInfo"/> row, newest first. Reuses Kentico's
-/// built-in LISTING template so this page needs no client-side React bundle — the admin shell
-/// renders columns + filter + sort out of the box, and we only configure which columns show.
+/// Lists every <see cref="SentinelScanRunInfo"/> row — including in-progress, failed, and
+/// cancelled runs — newest first. The <c>Status</c> column is exposed so admins can tell at a
+/// glance which executions actually completed vs. which bailed. Reuses Kentico's built-in
+/// LISTING template so this page needs no client-side React bundle; the admin shell renders
+/// columns + filter + sort out of the box, and we only configure which columns show.
 /// </summary>
 [UIEvaluatePermission(SystemPermissions.VIEW)]
 public class ScanHistoryListingPage : ListingPage
