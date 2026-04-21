@@ -22,7 +22,6 @@
     <ProjectReference Include="..\..\src\KenticoSentinel.Core\KenticoSentinel.Core.csproj" />
     <ProjectReference Include="..\..\src\KenticoSentinel\KenticoSentinel.csproj" />
     <ProjectReference Include="..\..\src\KenticoSentinel.XbyK\KenticoSentinel.XbyK.csproj" />
-    <ProjectReference Include="..\..\src\KenticoSentinel.XbyK.Admin\KenticoSentinel.XbyK.Admin.csproj" />
   </ItemGroup>
 
 </Project>

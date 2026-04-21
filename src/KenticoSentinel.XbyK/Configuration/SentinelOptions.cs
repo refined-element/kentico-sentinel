@@ -20,7 +20,6 @@ public sealed class SentinelOptions
     public RuntimeCheckOptions RuntimeChecks { get; set; } = new();
     public EmailDigestOptions EmailDigest { get; set; } = new();
     public EventLogOptions EventLogIntegration { get; set; } = new();
-    public ContactOptions Contact { get; set; } = new();
 
     // The run cadence lives in Kentico's Scheduled Tasks app (kentico-admin/applications/
     // scheduled-tasks). The Sentinel task is discovered on startup via the
@@ -72,21 +71,6 @@ public sealed class SentinelOptions
         public int MaxEntriesPerScan { get; set; } = 50;
     }
 
-    public sealed class ContactOptions
-    {
-        /// <summary>
-        /// Endpoint that receives the quote-submission POST. Blank = fall back to the hard-coded
-        /// default (<c>https://kentico-developer.com/api/scanner/submit</c>). Override when
-        /// pointing at a staging KDaaS or testing the round-trip locally with a fake.
-        /// </summary>
-        public string Endpoint { get; set; } = string.Empty;
-
-        /// <summary>
-        /// Default for sanitizer's <c>includeContext</c> toggle — when the admin UI submits a
-        /// quote for a scan, whether to include the full finding messages / locations in the
-        /// payload. False by default because finding text can embed site-specific paths or
-        /// class names that some operators prefer to keep internal.
-        /// </summary>
-        public bool IncludeContextByDefault { get; set; }
-    }
+    // ContactRefinedElement config lands in the Phase 4 PR along with the actual contact flow.
+    // Kept out of this release to avoid shipping dead option surface.
 }

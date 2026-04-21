@@ -43,9 +43,6 @@ jobs:
       - name: Pack XbyK integration
         run: dotnet pack src/KenticoSentinel.XbyK/KenticoSentinel.XbyK.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
 
-      - name: Pack XbyK Admin UI
-        run: dotnet pack src/KenticoSentinel.XbyK.Admin/KenticoSentinel.XbyK.Admin.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
-
       - name: Pack CLI tool
         run: dotnet pack src/KenticoSentinel/KenticoSentinel.csproj --configuration Release --no-build -p:Version=${{ steps.ver.outputs.version }} --output ./artifacts
 
