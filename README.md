@@ -81,7 +81,7 @@ Cadence lives in Kentico's Scheduled Tasks UI — no cron config in code.
 
 - **`RefinedElement_SentinelScanRun`** — one row per scan execution (trigger, duration, error/warning/info counts, status)
 - **`RefinedElement_SentinelFinding`** — one row per finding with a stable fingerprint for cross-scan acknowledgments
-- **`CMS_EventLog`** — summary entry per scan (source = `Sentinel`) + one entry per finding at or above `SeverityThreshold`
+- **`CMS_EventLog`** — summary entry per scan (source = `Sentinel`) + one entry per finding at or above `SeverityThreshold`, up to `EventLogIntegration.MaxEntriesPerScan`; if more findings qualify, Sentinel writes a single additional summary noting the suppressed event-log entries
 
 ### 6. Admin UI *(v0.3.0-alpha, in review)*
 
@@ -217,7 +217,7 @@ dotnet test KenticoSentinel.slnx    # 36+ unit tests — checks, sanitizer, runn
 |---|---|
 | `src/KenticoSentinel.Core` | Check engine, registry, sanitizer, reporting. Framework-agnostic. |
 | `src/KenticoSentinel.XbyK` | Embedded XbyK integration — Info models, installer, scheduled task, notifiers. |
-| `src/KenticoSentinel.XbyK.Admin` | *(in review)* Admin UI — listing pages. Optional. |
+| `src/KenticoSentinel.XbyK.Admin` | *(planned / not yet in this repo)* Admin UI — listing pages. Optional. |
 | `src/KenticoSentinel` | CLI tool (`sentinel`). |
 | `tests/KenticoSentinel.Tests` | xUnit tests across all packages. |
 
