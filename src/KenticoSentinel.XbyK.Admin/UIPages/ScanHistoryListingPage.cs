@@ -18,9 +18,11 @@ using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelScanRun;
 namespace RefinedElement.Kentico.Sentinel.XbyK.Admin.UIPages;
 
 /// <summary>
-/// Lists every completed <see cref="SentinelScanRunInfo"/> row, newest first. Reuses Kentico's
-/// built-in LISTING template so this page needs no client-side React bundle — the admin shell
-/// renders columns + filter + sort out of the box, and we only configure which columns show.
+/// Lists every <see cref="SentinelScanRunInfo"/> row — including in-progress, failed, and
+/// cancelled runs — newest first. The <c>Status</c> column is exposed so admins can tell at a
+/// glance which executions actually completed vs. which bailed. Reuses Kentico's built-in
+/// LISTING template so this page needs no client-side React bundle; the admin shell renders
+/// columns + filter + sort out of the box, and we only configure which columns show.
 /// </summary>
 [UIEvaluatePermission(SystemPermissions.VIEW)]
 public class ScanHistoryListingPage : ListingPage
@@ -29,12 +31,14 @@ public class ScanHistoryListingPage : ListingPage
 
     public override Task ConfigurePage()
     {
-        // Started-at descending is the natural operator mental model: "what ran most recently?"
-        // Kentico's listing sorts via query param; we set the default so the first page load
-        // already has the most useful order without forcing a click.
+        // Only ONE column carries a default sort so Kentico's listing framework picks the right
+        // default unambiguously. SentinelScanRunID is monotonically increasing with StartedAt
+        // (scan rows are only written by the service, never backdated), so sorting by ID desc
+        // gives the same "newest first" ordering an admin would expect from "Started desc" —
+        // without the ambiguity of two defaultSortDirection declarations.
         PageConfiguration.ColumnConfigurations
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunID), "#", sortable: true, defaultSortDirection: SortTypeEnum.Desc)
-            .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunStartedAt), "Started", sortable: true, defaultSortDirection: SortTypeEnum.Desc)
+            .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunStartedAt), "Started", sortable: true)
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunStatus), "Status", sortable: true, searchable: true)
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunTrigger), "Trigger", sortable: true, searchable: true)
             .AddColumn(nameof(SentinelScanRunInfo.SentinelScanRunTotalFindings), "Total", sortable: true)
