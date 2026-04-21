@@ -34,6 +34,19 @@ public interface ISentinelFindingAckService
 
     /// <summary>Count of findings currently Active (no ack or ack expired) across all scans.</summary>
     int CountActive(IEnumerable<string> fingerprints);
+
+    /// <summary>
+    /// Bulk acknowledge. Skips blank fingerprints and returns the count actually written, so the
+    /// caller can distinguish "asked for 20, wrote 18" from a wholesale failure. Note is applied
+    /// to every row (operator's batch reason — "bulk ack of deprecated warnings").
+    /// </summary>
+    int AcknowledgeMany(IEnumerable<string> fingerprints, int userId, string? note = null);
+
+    /// <summary>Bulk snooze. Same semantics as <see cref="AcknowledgeMany"/>.</summary>
+    int SnoozeMany(IEnumerable<string> fingerprints, DateTime until, int userId, string? note = null);
+
+    /// <summary>Bulk revoke — removes ack/snooze rows for all matching fingerprints.</summary>
+    int RevokeMany(IEnumerable<string> fingerprints);
 }
 
 /// <summary>Snapshot of a finding's ack state.</summary>

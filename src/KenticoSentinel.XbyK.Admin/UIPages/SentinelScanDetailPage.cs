@@ -71,6 +71,102 @@ public class SentinelScanDetailPage(
         return ResponseFrom(new ScanDetailResponse { Detail = detail });
     }
 
+    /// <summary>
+    /// Bulk variant of <see cref="SetAckState"/>. Applies the same action + note to every
+    /// fingerprint in the payload. Returns per-fingerprint updated state so the client can patch
+    /// its per-row ack chips without reloading the whole scan. Noisy checks (CNT006 event-log
+    /// repeats, dep-pin warnings) are the primary driver — clicking Acknowledge 47 times
+    /// individually doesn't scale.
+    /// </summary>
+    [PageCommand(Permission = SystemPermissions.UPDATE)]
+    public async Task<ICommandResponse<BulkAckResponse>> SetAckStateMany(BulkAckData data)
+    {
+        var user = await userAccessor.Get();
+        if (user is null)
+        {
+            return ResponseFrom(new BulkAckResponse
+            {
+                Success = false,
+                Message = "Cannot record acknowledgments without an authenticated admin user.",
+            });
+        }
+        var userId = user.UserID;
+
+        if (data.Fingerprints is null || data.Fingerprints.Length == 0)
+        {
+            return ResponseFrom(new BulkAckResponse { Success = false, Message = "No findings selected." });
+        }
+
+        int written;
+        switch (data.Action)
+        {
+            case "acknowledge":
+                written = ackService.AcknowledgeMany(data.Fingerprints, userId, data.Note);
+                break;
+            case "snooze":
+                if (!DateTime.TryParseExact(
+                        data.SnoozeUntilUtc,
+                        "O",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind,
+                        out var until))
+                {
+                    return ResponseFrom(new BulkAckResponse
+                    {
+                        Success = false,
+                        Message = "Invalid snooze date — expected ISO-8601 round-trip format.",
+                    });
+                }
+                if (until <= DateTime.UtcNow.AddMinutes(1))
+                {
+                    return ResponseFrom(new BulkAckResponse
+                    {
+                        Success = false,
+                        Message = "Snooze date must be at least one minute in the future.",
+                    });
+                }
+                written = ackService.SnoozeMany(data.Fingerprints, until, userId, data.Note);
+                break;
+            case "revoke":
+                written = ackService.RevokeMany(data.Fingerprints);
+                break;
+            default:
+                return ResponseFrom(new BulkAckResponse { Success = false, Message = $"Unknown action '{data.Action}'." });
+        }
+
+        // Re-fetch state for each affected fingerprint so the client can patch per-row chips
+        // without reloading the whole scan.
+        var newStates = ackService.GetAll(data.Fingerprints);
+        var updates = data.Fingerprints
+            .Select(fp =>
+            {
+                newStates.TryGetValue(fp, out var state);
+                return new BulkAckUpdate
+                {
+                    Fingerprint = fp,
+                    NewState = state?.State.ToString() ?? "Active",
+                    SnoozeUntilUtc = state?.SnoozeUntil?.ToString("O"),
+                    Note = state?.Note,
+                };
+            })
+            .ToArray();
+
+        return ResponseFrom(new BulkAckResponse
+        {
+            Success = true,
+            AffectedCount = written,
+            RequestedCount = data.Fingerprints.Length,
+            Updates = updates,
+            Message = data.Action switch
+            {
+                "acknowledge" => $"Acknowledged {written} finding{(written == 1 ? string.Empty : "s")}.",
+                "snooze" => $"Snoozed {written} finding{(written == 1 ? string.Empty : "s")}.",
+                "revoke" => $"Revoked ack on {written} finding{(written == 1 ? string.Empty : "s")}.",
+                _ => $"Processed {written} finding(s).",
+            },
+        });
+    }
+
     [PageCommand(Permission = SystemPermissions.UPDATE)]
     public async Task<ICommandResponse<AckMutationResponse>> SetAckState(AckMutationData data)
     {
@@ -269,6 +365,31 @@ public sealed class AckMutationResponse
 {
     public bool Success { get; set; }
     public string Message { get; set; } = string.Empty;
+    public string Fingerprint { get; set; } = string.Empty;
+    public string NewState { get; set; } = "Active";
+    public string? SnoozeUntilUtc { get; set; }
+    public string? Note { get; set; }
+}
+
+public sealed class BulkAckData
+{
+    public string[] Fingerprints { get; set; } = Array.Empty<string>();
+    public string Action { get; set; } = string.Empty; // "acknowledge" | "snooze" | "revoke"
+    public string? SnoozeUntilUtc { get; set; }
+    public string? Note { get; set; }
+}
+
+public sealed class BulkAckResponse
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = string.Empty;
+    public int AffectedCount { get; set; }
+    public int RequestedCount { get; set; }
+    public BulkAckUpdate[] Updates { get; set; } = Array.Empty<BulkAckUpdate>();
+}
+
+public sealed class BulkAckUpdate
+{
     public string Fingerprint { get; set; } = string.Empty;
     public string NewState { get; set; } = "Active";
     public string? SnoozeUntilUtc { get; set; }

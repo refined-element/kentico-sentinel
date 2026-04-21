@@ -64,6 +64,21 @@ interface AckMutationResponse {
     readonly note: string | null;
 }
 
+interface BulkAckUpdate {
+    readonly fingerprint: string;
+    readonly newState: string;
+    readonly snoozeUntilUtc: string | null;
+    readonly note: string | null;
+}
+
+interface BulkAckResponse {
+    readonly success: boolean;
+    readonly message: string;
+    readonly affectedCount: number;
+    readonly requestedCount: number;
+    readonly updates: ReadonlyArray<BulkAckUpdate>;
+}
+
 const COLORS = {
     lime: '#D6F08D',
     limeDark: '#B8D870',
@@ -127,6 +142,33 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
             } else if (r) {
                 setFeedback(r.message || 'Ack update failed.');
             }
+        },
+    });
+
+    // Selected-fingerprint set drives the bulk-action bar. Stored as Set for O(1) toggle/check
+    // across the findings list; cleared after every successful bulk mutation so the admin
+    // doesn't accidentally re-mutate the same set.
+    const [selected, setSelected] = useState<Set<string>>(new Set());
+
+    const { execute: bulkCmd } = usePageCommand<BulkAckResponse, { fingerprints: string[]; action: string; snoozeUntilUtc?: string; note?: string }>('SetAckStateMany', {
+        after: (r) => {
+            if (!r) return;
+            if (r.success) {
+                setAckStates((prev) => {
+                    const next = { ...prev };
+                    for (const u of r.updates) {
+                        next[u.fingerprint] = {
+                            ackState: u.newState,
+                            snoozeUntilUtc: u.snoozeUntilUtc,
+                            ackNote: u.note,
+                        };
+                    }
+                    return next;
+                });
+                setSelected(new Set());
+            }
+            setFeedback(r.message);
+            window.setTimeout(() => setFeedback(null), 4000);
         },
     });
 
@@ -229,6 +271,26 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
                 }}
             />
 
+            <BulkActionBar
+                selected={selected}
+                visibleFingerprints={visibleFindings.map((f) => f.fingerprint)}
+                onToggleAll={(allVisible) => {
+                    // Select-all toggles the entire visible set; clicking again clears it. Keeps
+                    // the UX predictable even when the filter tabs change what "visible" means.
+                    setSelected((prev) => {
+                        const allSelected = allVisible.every((fp) => prev.has(fp));
+                        if (allSelected) {
+                            const next = new Set(prev);
+                            for (const fp of allVisible) next.delete(fp);
+                            return next;
+                        }
+                        return new Set([...prev, ...allVisible]);
+                    });
+                }}
+                onClear={() => setSelected(new Set())}
+                onBulk={(action, payload) => bulkCmd({ fingerprints: Array.from(selected), action, ...(payload ?? {}) })}
+            />
+
             {byCategory.length === 0 ? (
                 <div style={{ padding: 48, textAlign: 'center', color: COLORS.textMuted, background: COLORS.bg, border: `1px solid ${COLORS.border}`, borderRadius: 10 }}>
                     <div style={{ fontSize: 32, marginBottom: 8, opacity: 0.5 }}>✓</div>
@@ -241,9 +303,145 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
                         category={category}
                         findings={items}
                         ackStates={ackStates}
+                        selected={selected}
+                        onToggleSelect={(fp) => setSelected((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(fp)) next.delete(fp); else next.add(fp);
+                            return next;
+                        })}
+                        onToggleCategory={(fps) => setSelected((prev) => {
+                            const allSelected = fps.every((fp) => prev.has(fp));
+                            const next = new Set(prev);
+                            if (allSelected) {
+                                for (const fp of fps) next.delete(fp);
+                            } else {
+                                for (const fp of fps) next.add(fp);
+                            }
+                            return next;
+                        })}
                         onMutate={(payload) => mutateAck(payload)}
                     />
                 ))
+            )}
+        </div>
+    );
+};
+
+const BulkActionBar = ({
+    selected,
+    visibleFingerprints,
+    onToggleAll,
+    onClear,
+    onBulk,
+}: {
+    selected: Set<string>;
+    visibleFingerprints: string[];
+    onToggleAll: (visible: string[]) => void;
+    onClear: () => void;
+    onBulk: (action: 'acknowledge' | 'snooze' | 'revoke', payload?: { snoozeUntilUtc?: string; note?: string }) => void;
+}) => {
+    const [noteDraft, setNoteDraft] = useState('');
+    const [snoozeOpen, setSnoozeOpen] = useState(false);
+    const [snoozeDays, setSnoozeDays] = useState(7);
+
+    const allVisibleSelected = visibleFingerprints.length > 0 && visibleFingerprints.every((fp) => selected.has(fp));
+    const count = selected.size;
+
+    return (
+        <div
+            style={{
+                position: 'sticky',
+                top: 0,
+                zIndex: 2,
+                background: count > 0 ? COLORS.lime : COLORS.bg,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 10,
+                padding: '10px 16px',
+                marginBottom: 16,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                flexWrap: 'wrap',
+                transition: 'background 120ms ease',
+            }}
+        >
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: COLORS.textPrimary, cursor: visibleFingerprints.length > 0 ? 'pointer' : 'default' }}>
+                <input
+                    type="checkbox"
+                    disabled={visibleFingerprints.length === 0}
+                    checked={allVisibleSelected}
+                    onChange={() => onToggleAll(visibleFingerprints)}
+                    aria-label="Select all visible findings"
+                />
+                {count > 0 ? `${count} selected` : 'Select all visible'}
+            </label>
+            {count > 0 && (
+                <>
+                    <input
+                        type="text"
+                        placeholder="Optional note (applied to all)"
+                        value={noteDraft}
+                        onChange={(e) => setNoteDraft(e.target.value)}
+                        style={{ flex: '1 1 240px', minWidth: 200, padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}
+                    />
+                    <Button
+                        type={ButtonType.Button}
+                        label="Acknowledge"
+                        size={ButtonSize.S}
+                        color={ButtonColor.Primary}
+                        onClick={() => onBulk('acknowledge', { note: noteDraft.trim() || undefined })}
+                    />
+                    <Button
+                        type={ButtonType.Button}
+                        label={snoozeOpen ? 'Cancel snooze' : 'Snooze…'}
+                        size={ButtonSize.S}
+                        color={ButtonColor.Secondary}
+                        onClick={() => setSnoozeOpen(!snoozeOpen)}
+                    />
+                    <Button
+                        type={ButtonType.Button}
+                        label="Revoke"
+                        size={ButtonSize.S}
+                        color={ButtonColor.Secondary}
+                        onClick={() => onBulk('revoke')}
+                    />
+                    <Button
+                        type={ButtonType.Button}
+                        label="Clear selection"
+                        size={ButtonSize.S}
+                        color={ButtonColor.Secondary}
+                        onClick={() => { onClear(); setNoteDraft(''); setSnoozeOpen(false); }}
+                    />
+                    {snoozeOpen && (
+                        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexBasis: '100%', paddingTop: 8, borderTop: `1px solid ${COLORS.border}` }}>
+                            <label style={{ fontSize: 12, color: COLORS.textMuted }}>
+                                Snooze for
+                                <select
+                                    value={snoozeDays}
+                                    onChange={(e) => setSnoozeDays(Number(e.target.value))}
+                                    style={{ marginLeft: 6, padding: '4px 8px', border: `1px solid ${COLORS.border}`, borderRadius: 4, fontSize: 12 }}
+                                >
+                                    <option value={1}>1 day</option>
+                                    <option value={7}>7 days</option>
+                                    <option value={30}>30 days</option>
+                                    <option value={90}>90 days</option>
+                                </select>
+                            </label>
+                            <Button
+                                type={ButtonType.Button}
+                                label={`Snooze all ${count} for ${snoozeDays}d`}
+                                size={ButtonSize.S}
+                                color={ButtonColor.Primary}
+                                onClick={() => {
+                                    const until = new Date();
+                                    until.setUTCDate(until.getUTCDate() + snoozeDays);
+                                    onBulk('snooze', { snoozeUntilUtc: until.toISOString(), note: noteDraft.trim() || undefined });
+                                    setSnoozeOpen(false);
+                                }}
+                            />
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );
@@ -307,61 +505,100 @@ const CategorySection = ({
     category,
     findings,
     ackStates,
+    selected,
+    onToggleSelect,
+    onToggleCategory,
     onMutate,
 }: {
     category: string;
     findings: FindingDetail[];
     ackStates: Record<string, { ackState: string; snoozeUntilUtc: string | null; ackNote: string | null }>;
+    selected: Set<string>;
+    onToggleSelect: (fingerprint: string) => void;
+    onToggleCategory: (fingerprints: string[]) => void;
     onMutate: (data: { fingerprint: string; action: string; snoozeUntilUtc?: string; note?: string }) => void;
-}) => (
-    <section
-        style={{
-            background: COLORS.bg,
-            border: `1px solid ${COLORS.border}`,
-            borderRadius: 10,
-            overflow: 'hidden',
-            marginBottom: 16,
-        }}
-    >
-        <header style={{ padding: '12px 20px', background: COLORS.bgMuted, borderBottom: `1px solid ${COLORS.border}` }}>
-            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 0.3 }}>
-                {category} <span style={{ color: COLORS.textMuted, fontWeight: 500, marginLeft: 8 }}>{findings.length}</span>
-            </h3>
-        </header>
-        <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
-            {findings.map((f) => {
-                const currentAck = ackStates[f.fingerprint]?.ackState ?? f.ackState;
-                return (
-                    <FindingRow
-                        key={f.findingId}
-                        finding={f}
-                        ackState={currentAck}
-                        snoozeUntil={ackStates[f.fingerprint]?.snoozeUntilUtc ?? f.snoozeUntilUtc}
-                        onMutate={onMutate}
-                    />
-                );
-            })}
-        </ul>
-    </section>
-);
+}) => {
+    const categoryFingerprints = findings.map((f) => f.fingerprint);
+    const allCategorySelected = categoryFingerprints.length > 0 && categoryFingerprints.every((fp) => selected.has(fp));
+    const someCategorySelected = !allCategorySelected && categoryFingerprints.some((fp) => selected.has(fp));
+
+    return (
+        <section
+            style={{
+                background: COLORS.bg,
+                border: `1px solid ${COLORS.border}`,
+                borderRadius: 10,
+                overflow: 'hidden',
+                marginBottom: 16,
+            }}
+        >
+            <header style={{ padding: '12px 20px', background: COLORS.bgMuted, borderBottom: `1px solid ${COLORS.border}`, display: 'flex', alignItems: 'center', gap: 10 }}>
+                <input
+                    type="checkbox"
+                    checked={allCategorySelected}
+                    // indeterminate doesn't round-trip via the checked attribute — set it via ref
+                    // so a partial category selection visually reads as "some, not all".
+                    ref={(el) => { if (el) el.indeterminate = someCategorySelected; }}
+                    onChange={() => onToggleCategory(categoryFingerprints)}
+                    aria-label={`Select all findings in ${category}`}
+                />
+                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                    {category} <span style={{ color: COLORS.textMuted, fontWeight: 500, marginLeft: 8 }}>{findings.length}</span>
+                </h3>
+            </header>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0 }}>
+                {findings.map((f) => {
+                    const currentAck = ackStates[f.fingerprint]?.ackState ?? f.ackState;
+                    return (
+                        <FindingRow
+                            key={f.findingId}
+                            finding={f}
+                            ackState={currentAck}
+                            snoozeUntil={ackStates[f.fingerprint]?.snoozeUntilUtc ?? f.snoozeUntilUtc}
+                            isSelected={selected.has(f.fingerprint)}
+                            onToggleSelect={() => onToggleSelect(f.fingerprint)}
+                            onMutate={onMutate}
+                        />
+                    );
+                })}
+            </ul>
+        </section>
+    );
+};
 
 const FindingRow = ({
     finding,
     ackState,
     snoozeUntil,
+    isSelected,
+    onToggleSelect,
     onMutate,
 }: {
     finding: FindingDetail;
     ackState: string;
     snoozeUntil: string | null;
+    isSelected: boolean;
+    onToggleSelect: () => void;
     onMutate: (data: { fingerprint: string; action: string; snoozeUntilUtc?: string; note?: string }) => void;
 }) => {
     const [expanded, setExpanded] = useState(false);
     const color = severityColor(finding.severity);
 
     return (
-        <li style={{ padding: '14px 20px', borderBottom: `1px solid ${COLORS.border}` }}>
-            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12, alignItems: 'start' }}>
+        <li style={{
+            padding: '14px 20px',
+            borderBottom: `1px solid ${COLORS.border}`,
+            background: isSelected ? `${COLORS.lime}33` : 'transparent',
+            transition: 'background 100ms ease',
+        }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr auto', gap: 12, alignItems: 'start' }}>
+                <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={onToggleSelect}
+                    aria-label={`Select finding ${finding.ruleId}`}
+                    style={{ marginTop: 4 }}
+                />
                 <SeverityBadge severity={finding.severity} color={color} />
                 <div>
                     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>

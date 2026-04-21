@@ -76,6 +76,58 @@ internal sealed class SentinelFindingAckService(
         return total - suppressed;
     }
 
+    public int AcknowledgeMany(IEnumerable<string> fingerprints, int userId, string? note = null)
+    {
+        var written = 0;
+        foreach (var fingerprint in Deduplicate(fingerprints))
+        {
+            Upsert(fingerprint, StateAcknowledged, snoozeUntil: null, userId, note);
+            written++;
+        }
+        return written;
+    }
+
+    public int SnoozeMany(IEnumerable<string> fingerprints, DateTime until, int userId, string? note = null)
+    {
+        if (until.Kind == DateTimeKind.Unspecified)
+        {
+            until = DateTime.SpecifyKind(until, DateTimeKind.Utc);
+        }
+        var utc = until.ToUniversalTime();
+        var written = 0;
+        foreach (var fingerprint in Deduplicate(fingerprints))
+        {
+            Upsert(fingerprint, StateSnoozed, snoozeUntil: utc, userId, note);
+            written++;
+        }
+        return written;
+    }
+
+    public int RevokeMany(IEnumerable<string> fingerprints)
+    {
+        // Single query to fetch all matching rows, one Delete call each. Kentico's generic
+        // IInfoProvider doesn't expose bulk-delete by predicate, so we eat N round-trips —
+        // fine at the 10s-to-100s scale of a batch admin action.
+        var hashes = Deduplicate(fingerprints).ToArray();
+        if (hashes.Length == 0) return 0;
+
+        var rows = ackProvider.Get()
+            .WhereIn(nameof(SentinelFindingAckInfo.SentinelFindingAckFingerprintHash), hashes)
+            .ToList();
+        foreach (var row in rows)
+        {
+            ackProvider.Delete(row);
+        }
+        return rows.Count;
+    }
+
+    // Strip whitespace-only fingerprints AND duplicates before any bulk writer iterates. Keeps
+    // the per-method code focused on the actual operation.
+    private static IEnumerable<string> Deduplicate(IEnumerable<string> fingerprints) =>
+        fingerprints
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Distinct(StringComparer.OrdinalIgnoreCase);
+
     private void Upsert(string fingerprint, string state, DateTime? snoozeUntil, int userId, string? note)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(fingerprint);
