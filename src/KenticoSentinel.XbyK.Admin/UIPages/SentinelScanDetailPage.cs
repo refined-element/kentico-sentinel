@@ -398,8 +398,15 @@ public class SentinelScanDetailPage(
         // Cross-scan history — for each fingerprint in this scan, count how many other scans it
         // appears in and when it was first detected. Lets the admin triage "this has been open
         // for 3 weeks across 8 scans" vs "new in this run" at a glance. One query pre-computed
-        // so the per-row loop is O(1) lookup.
-        var history = BuildFingerprintHistory(findings.Select(f => f.SentinelFindingFingerprintHash).ToArray());
+        // so the per-row loop is O(1) lookup. Distinct() BEFORE passing to WhereIn so the SQL
+        // IN clause size is bounded by the number of unique fingerprints, not the scan's
+        // finding count (a 5000-finding scan with 40 unique rules would otherwise hit SQL's
+        // 2100-parameter limit and fail the whole page load).
+        var uniqueFingerprints = findings
+            .Select(f => f.SentinelFindingFingerprintHash)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var history = BuildFingerprintHistory(uniqueFingerprints);
 
         var findingDtos = findings.Select(f =>
         {

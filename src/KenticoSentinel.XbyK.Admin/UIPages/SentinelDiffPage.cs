@@ -68,7 +68,7 @@ public class SentinelDiffPage(
     [PageCommand]
     public Task<ICommandResponse<DiffResponse>> ComputeDiff(DiffRequestData data)
     {
-        if (data.BeforeRunId <= 0 || data.AfterRunId <= 0)
+        if (data is null || data.BeforeRunId <= 0 || data.AfterRunId <= 0)
         {
             return Task.FromResult(ResponseFrom(new DiffResponse { Message = "Both scan selections are required." }));
         }

@@ -798,9 +798,10 @@ const AckBadge = ({ state, until }: { state: string; until: string | null }) => 
     );
 };
 
-// "New" vs "seen in N scans, first X ago" triage chip. Operator values: new = fresh regression,
-// worth investigating; long-running = known/accepted debt, ack candidate. Hidden for the one
-// case that matters but isn't interesting — single-occurrence findings in a first-time install.
+// "New" vs "seen in N scans, first X ago" triage chip. Operator values: NEW = fresh regression,
+// worth investigating; long-running = known/accepted debt, ack candidate. Findings that only
+// appear in the current scan (or have no first-seen history) render the green NEW chip —
+// helpful in both a first-time install AND on a subsequent scan where something actually is new.
 const AgeBadge = ({ scanCount, firstSeenUtc }: { scanCount: number; firstSeenUtc: string | null }) => {
     if (scanCount <= 1 || !firstSeenUtc) {
         return (

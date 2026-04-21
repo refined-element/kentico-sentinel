@@ -45,8 +45,10 @@ public static class FingerprintFormat
 internal sealed class SentinelFindingAckService(
     IInfoProvider<SentinelFindingAckInfo> ackProvider) : ISentinelFindingAckService
 {
-    private const string StateAcknowledged = "Acknowledged";
-    private const string StateSnoozed = "Snoozed";
+    // Internal so unit tests in KenticoSentinel.Tests can exercise ToAck's snooze-expiry logic
+    // directly without having to stub the full IInfoProvider<T> surface.
+    internal const string StateAcknowledged = "Acknowledged";
+    internal const string StateSnoozed = "Snoozed";
 
     public FindingAck? Get(string fingerprint)
     {
@@ -200,11 +202,32 @@ internal sealed class SentinelFindingAckService(
             .TopN(1)
             .FirstOrDefault();
 
-    private static FindingAck ToAck(SentinelFindingAckInfo row)
+    internal static FindingAck ToAck(SentinelFindingAckInfo row) => MapRow(
+        fingerprint: row.SentinelFindingAckFingerprintHash,
+        stateColumn: row.SentinelFindingAckState,
+        snoozeUntilRaw: row.SentinelFindingAckSnoozeUntil,
+        userId: row.SentinelFindingAckUserID,
+        noteColumn: row.SentinelFindingAckNote,
+        ackedAtRaw: row.SentinelFindingAckAckedAt,
+        nowUtc: DateTime.UtcNow);
+
+    /// <summary>
+    /// Pure-function read-side mapping from the raw column values to a <see cref="FindingAck"/>.
+    /// Factored out so unit tests can exercise the snooze-expiry + state-normalization logic
+    /// without booting Kentico's IoC container (which <see cref="SentinelFindingAckInfo"/>
+    /// requires in its constructor).
+    /// </summary>
+    internal static FindingAck MapRow(
+        string fingerprint,
+        string stateColumn,
+        DateTime snoozeUntilRaw,
+        int userId,
+        string noteColumn,
+        DateTime ackedAtRaw,
+        DateTime nowUtc)
     {
-        var isSnoozedNow = row.SentinelFindingAckState == StateSnoozed
-            && row.SentinelFindingAckSnoozeUntil > DateTime.UtcNow;
-        var state = row.SentinelFindingAckState switch
+        var isSnoozedNow = stateColumn == StateSnoozed && snoozeUntilRaw > nowUtc;
+        var state = stateColumn switch
         {
             StateAcknowledged => AckState.Acknowledged,
             StateSnoozed when isSnoozedNow => AckState.Snoozed,
@@ -215,15 +238,15 @@ internal sealed class SentinelFindingAckService(
         // reports Active; leaving a non-null SnoozeUntil on an Active result would confuse the
         // UI ("looks snoozed but behaves active"). Acknowledged is permanent so never carries an
         // expiry either.
-        var snoozeUntil = isSnoozedNow && row.SentinelFindingAckSnoozeUntil != default
-            ? DateTime.SpecifyKind(row.SentinelFindingAckSnoozeUntil, DateTimeKind.Utc)
+        var snoozeUntil = isSnoozedNow && snoozeUntilRaw != default
+            ? DateTime.SpecifyKind(snoozeUntilRaw, DateTimeKind.Utc)
             : (DateTime?)null;
         return new FindingAck(
-            Fingerprint: row.SentinelFindingAckFingerprintHash,
+            Fingerprint: fingerprint,
             State: state,
             SnoozeUntil: snoozeUntil,
-            UserId: row.SentinelFindingAckUserID,
-            Note: string.IsNullOrWhiteSpace(row.SentinelFindingAckNote) ? null : row.SentinelFindingAckNote,
-            AckedAt: DateTime.SpecifyKind(row.SentinelFindingAckAckedAt, DateTimeKind.Utc));
+            UserId: userId,
+            Note: string.IsNullOrWhiteSpace(noteColumn) ? null : noteColumn,
+            AckedAt: DateTime.SpecifyKind(ackedAtRaw, DateTimeKind.Utc));
     }
 }
