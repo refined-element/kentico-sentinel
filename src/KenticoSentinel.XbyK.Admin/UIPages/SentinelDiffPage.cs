@@ -117,8 +117,19 @@ public class SentinelDiffPage(
     }
 
     private List<SentinelFindingInfo> LoadFindings(int runId) =>
+        // Only the columns ToDiff reads — keeps the SQL payload tight for scans with thousands
+        // of findings where the unused columns (Remediation body, QuoteEligible flag, timestamps)
+        // would otherwise pull unused bytes across the wire.
         findingProvider.Get()
             .WhereEquals(nameof(SentinelFindingInfo.SentinelFindingScanRunID), runId)
+            .Columns(
+                nameof(SentinelFindingInfo.SentinelFindingFingerprintHash),
+                nameof(SentinelFindingInfo.SentinelFindingRuleID),
+                nameof(SentinelFindingInfo.SentinelFindingRuleTitle),
+                nameof(SentinelFindingInfo.SentinelFindingCategory),
+                nameof(SentinelFindingInfo.SentinelFindingSeverity),
+                nameof(SentinelFindingInfo.SentinelFindingMessage),
+                nameof(SentinelFindingInfo.SentinelFindingLocation))
             .ToList();
 
     private static DiffFindingDto ToDiff(SentinelFindingInfo f) => new()

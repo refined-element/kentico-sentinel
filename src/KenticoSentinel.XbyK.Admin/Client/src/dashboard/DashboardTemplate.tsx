@@ -569,7 +569,7 @@ const TopRulesList = ({ rules }: { rules: ReadonlyArray<RuleCount> }) => {
                                     href={`/admin/sentinel/scan-detail?rule=${encodeURIComponent(r.ruleId)}`}
                                     style={{ color: COLORS.limeDark, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}
                                 >
-                                    View {r.activeCount} active finding{r.activeCount === 1 ? '' : 's'} in latest scan →
+                                    View {r.activeCount} active finding{r.activeCount === 1 ? '' : 's'} across recent scans →
                                 </a>
                             </div>
                         )}
