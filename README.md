@@ -6,7 +6,7 @@
 
 Free, open-source. Ships in two forms:
 
-- **Embedded NuGet** for your XbyK site — installs alongside the app, runs on Kentico's scheduler, persists findings to custom tables, mirrors summaries to `CMS_EventLog`, emails digests. Zero-config defaults.
+- **Embedded NuGet** for your XbyK site — installs alongside the app, runs on Kentico's scheduler, persists findings to custom tables, mirrors summaries to `CMS_EventLog`. Scans on the default cadence once the admin enables the scheduled task; email digests are opt-in (set `Sentinel:EmailDigest:Recipients`).
 - **CLI tool** for one-shot scans from a terminal or CI — same check suite, HTML + JSON reports, remote GitHub-repo mode.
 
 Built by [Refined Element](https://refinedelement.com) — Kentico Community Leaders 2025 & 2026.
@@ -46,14 +46,16 @@ builder.Services.AddKenticoSentinel(builder.Configuration);
 
 In `appsettings.json`:
 
+Values below are the **actual code defaults** — omit a key entirely to get the default, override only what you want to change.
+
 ```jsonc
 "Sentinel": {
   "Enabled": true,
   "Checks": { "Excluded": [] },
   "RuntimeChecks": {
     "ConnectionString": "",   // blank = reuse CMSConnectionString
-    "StaleDays": 365,
-    "EventLogDays": 7
+    "StaleDays": 180,
+    "EventLogDays": 30
   },
   "EventLogIntegration": {
     "Enabled": true,
@@ -61,8 +63,8 @@ In `appsettings.json`:
     "MaxEntriesPerScan": 50
   },
   "EmailDigest": {
-    "Enabled": false,
-    "Recipients": [],
+    "Enabled": true,                  // true by default, but digests don't SEND unless Recipients is non-empty
+    "Recipients": [],                 // add SMTP addresses here to opt in
     "SeverityThreshold": "Warning",
     "OnlyWhenThresholdFindings": true
   }
@@ -83,9 +85,11 @@ Cadence lives in Kentico's Scheduled Tasks UI — no cron config in code.
 - **`RefinedElement_SentinelFinding`** — one row per finding with a stable fingerprint for cross-scan acknowledgments
 - **`CMS_EventLog`** — summary entry per scan (source = `Sentinel`) + one entry per finding at or above `SeverityThreshold`, up to `EventLogIntegration.MaxEntriesPerScan`; if more findings qualify, Sentinel writes a single additional summary noting the suppressed event-log entries
 
-### 6. Admin UI *(v0.3.0-alpha, in review)*
+### 6. Admin UI *(preview — v0.3.0-alpha in active review on the `feat/admin-ui*` branches)*
 
-The companion package `RefinedElement.Kentico.Sentinel.XbyK.Admin` adds **Configuration → Sentinel** to the admin left-nav with listing pages for Scan history and Findings. Drop the reference in, no extra DI wiring needed.
+A companion package `RefinedElement.Kentico.Sentinel.XbyK.Admin` adds **Configuration → Sentinel** to the admin left-nav. When it merges it will include Dashboard / Scan history / Findings / Scan detail / Compare scans / Request-a-quote / Settings pages. Drop the reference in, no extra DI wiring needed.
+
+**Not on `main` yet** — track progress in the repo's open PRs. This README will be updated with install instructions (and a concrete NuGet version) when v0.3.0-alpha publishes.
 
 ## CLI (alternative / CI)
 
