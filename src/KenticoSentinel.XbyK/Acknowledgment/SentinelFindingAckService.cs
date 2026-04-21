@@ -226,14 +226,20 @@ internal sealed class SentinelFindingAckService(
         DateTime ackedAtRaw,
         DateTime nowUtc)
     {
-        var isSnoozedNow = stateColumn == StateSnoozed && snoozeUntilRaw > nowUtc;
-        var state = stateColumn switch
-        {
-            StateAcknowledged => AckState.Acknowledged,
-            StateSnoozed when isSnoozedNow => AckState.Snoozed,
-            StateSnoozed => AckState.Active, // snooze expired — natural reversion without cleanup job
-            _ => AckState.Active,
-        };
+        // Normalize: trim + case-insensitive comparison. The write path only ever persists the
+        // canonical "Acknowledged" / "Snoozed" strings, but the column is free-text and a manual
+        // DB edit (or a legacy row written by a pre-release version) could produce "snoozed"
+        // or " Acknowledged "; treating those as Active would silently un-suppress findings the
+        // operator has already triaged.
+        var normalized = stateColumn?.Trim() ?? string.Empty;
+        var isAcknowledged = string.Equals(normalized, StateAcknowledged, StringComparison.OrdinalIgnoreCase);
+        var isSnoozed = string.Equals(normalized, StateSnoozed, StringComparison.OrdinalIgnoreCase);
+        var isSnoozedNow = isSnoozed && snoozeUntilRaw > nowUtc;
+        var state = isAcknowledged
+            ? AckState.Acknowledged
+            : isSnoozedNow
+                ? AckState.Snoozed
+                : AckState.Active; // snooze expired OR unknown state — natural reversion, no cleanup job
         // Only surface SnoozeUntil while the snooze is still active. Once it expires the finding
         // reports Active; leaving a non-null SnoozeUntil on an Active result would confuse the
         // UI ("looks snoozed but behaves active"). Acknowledged is permanent so never carries an

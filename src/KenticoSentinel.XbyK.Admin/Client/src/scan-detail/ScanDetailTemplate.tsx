@@ -221,6 +221,11 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
     };
 
     const onScanChange = (runId: number) => {
+        // Drop any pending selection + feedback — the findings we're about to load are a
+        // different set, and mutating "hidden" fingerprints the user can no longer see is a
+        // real footgun. Better UX to make the admin re-select in the new scan deliberately.
+        setSelected(new Set());
+        setFeedback(null);
         setSelectedRunId(runId);
         loadScan({ runId });
     };

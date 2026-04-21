@@ -165,12 +165,30 @@ public class SentinelScanDetailPage(
         // like "=HYPERLINK(...)" would execute in a spreadsheet client. Prefix with apostrophe;
         // Excel strips it on display while still treating the cell as text. Applied BEFORE the
         // RFC 4180 quoting step so the apostrophe is inside the quoted value.
-        var defused = value.Length > 0 && Array.IndexOf(FormulaTriggers, value[0]) >= 0
-            ? "'" + value
-            : value;
+        //
+        // Leading-whitespace bypass: Excel will still evaluate `  =HYPERLINK(...)` / `\t=cmd`
+        // in enough configurations that naively checking value[0] alone lets the attacker
+        // defeat the defuser by prepending a space. Scan past ASCII whitespace + tab to find
+        // the first "real" character and trigger on THAT. We preserve the original value
+        // verbatim (prepending the apostrophe) — don't mutate the displayed content.
+        var defused = StartsWithFormulaTrigger(value) ? "'" + value : value;
         return defused.IndexOfAny(CsvSpecialChars) >= 0
             ? "\"" + defused.Replace("\"", "\"\"") + "\""
             : defused;
+    }
+
+    private static bool StartsWithFormulaTrigger(string value)
+    {
+        for (var i = 0; i < value.Length; i++)
+        {
+            var c = value[i];
+            if (c == ' ' || c == '\t')
+            {
+                continue;
+            }
+            return Array.IndexOf(FormulaTriggers, c) >= 0;
+        }
+        return false;
     }
 
     /// <summary>
@@ -206,11 +224,16 @@ public class SentinelScanDetailPage(
             return ResponseFrom(new BulkAckResponse { Success = false, Message = "No findings selected." });
         }
 
-        // Filter to fingerprints that satisfy the 64-hex-char SHA-256 invariant BEFORE handing
-        // to the service. The service's Deduplicate helper applies the same filter, but doing it
-        // here lets us report the skipped count back to the caller so a client passing garbled
-        // data sees a clear "N skipped" message instead of silent loss.
-        var valid = data.Fingerprints.Where(FingerprintFormat.IsValid).ToArray();
+        // Filter to fingerprints that satisfy the 64-hex-char SHA-256 invariant AND de-duplicate
+        // (case-insensitive) BEFORE handing to the service. We do this here — rather than relying
+        // solely on the service's Deduplicate helper — because the response Updates[] array is
+        // built from this same collection. Without a pre-dedupe, a payload with duplicate
+        // fingerprints would produce: (a) `written < valid.Length` because the service merges
+        // them, and (b) duplicate entries in Updates[], both of which desync the client UI.
+        var valid = data.Fingerprints
+            .Where(FingerprintFormat.IsValid)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
         var skipped = data.Fingerprints.Length - valid.Length;
         if (valid.Length == 0)
         {

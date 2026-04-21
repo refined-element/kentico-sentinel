@@ -90,6 +90,43 @@ public class SentinelFindingAckServiceTests
         Assert.Equal(AckState.Active, ack.State);
     }
 
+    [Theory]
+    [InlineData("acknowledged")]
+    [InlineData("ACKNOWLEDGED")]
+    [InlineData("  Acknowledged ")]
+    public void Acknowledged_state_mapping_is_case_insensitive_and_trimmed(string stateColumn)
+    {
+        // Write path only persists canonical "Acknowledged" / "Snoozed" strings, but the column
+        // is free-text — a manual DB edit could produce "acknowledged" and we must still honour
+        // the operator's intent instead of silently re-surfacing the finding as Active.
+        var ack = SentinelFindingAckService.MapRow(
+            fingerprint: Fp,
+            stateColumn: stateColumn,
+            snoozeUntilRaw: default,
+            userId: 7,
+            noteColumn: string.Empty,
+            ackedAtRaw: Now,
+            nowUtc: Now);
+
+        Assert.Equal(AckState.Acknowledged, ack.State);
+    }
+
+    [Fact]
+    public void Snoozed_state_mapping_is_case_insensitive_and_trimmed()
+    {
+        var future = Now.AddDays(3);
+        var ack = SentinelFindingAckService.MapRow(
+            fingerprint: Fp,
+            stateColumn: "  snoozed",
+            snoozeUntilRaw: future,
+            userId: 7,
+            noteColumn: string.Empty,
+            ackedAtRaw: Now,
+            nowUtc: Now);
+
+        Assert.Equal(AckState.Snoozed, ack.State);
+    }
+
     [Fact]
     public void Unknown_state_string_maps_to_Active_safely()
     {
