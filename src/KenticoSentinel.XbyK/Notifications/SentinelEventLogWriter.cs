@@ -4,7 +4,6 @@ using Microsoft.Extensions.Options;
 
 using RefinedElement.Kentico.Sentinel.Core;
 using RefinedElement.Kentico.Sentinel.XbyK.Configuration;
-using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelScanRun;
 
 namespace RefinedElement.Kentico.Sentinel.XbyK.Notifications;
 
@@ -14,17 +13,17 @@ internal sealed class SentinelEventLogWriter(IEventLogService eventLog, IOptions
 
     private readonly SentinelOptions options = options.Value;
 
-    public void Write(SentinelScanRunInfo run, IReadOnlyList<Finding> findings)
+    public void Write(ScanRunSummary run, IReadOnlyList<Finding> findings)
     {
         // One summary entry per scan so admins see a pulse even when everything is clean.
         eventLog.LogInformation(
             source: EventSource,
             eventCode: "SCAN_COMPLETED",
             eventDescription:
-                $"Sentinel scan #{run.SentinelScanRunID} completed — " +
-                $"{run.SentinelScanRunTotalFindings} findings " +
-                $"({run.SentinelScanRunErrorCount}E/{run.SentinelScanRunWarningCount}W/{run.SentinelScanRunInfoCount}I), " +
-                $"trigger={run.SentinelScanRunTrigger}, version={run.SentinelScanRunSentinelVersion}.");
+                $"Sentinel scan #{run.RunId} completed — " +
+                $"{run.TotalFindings} findings " +
+                $"({run.ErrorCount}E/{run.WarningCount}W/{run.InfoCount}I), " +
+                $"trigger={run.Trigger}, version={run.SentinelVersion}.");
 
         if (!Enum.TryParse<Severity>(options.EventLogIntegration.SeverityThreshold, ignoreCase: true, out var threshold))
         {
@@ -65,7 +64,7 @@ internal sealed class SentinelEventLogWriter(IEventLogService eventLog, IOptions
                 source: EventSource,
                 eventCode: "FINDINGS_TRUNCATED",
                 eventDescription:
-                    $"Sentinel scan #{run.SentinelScanRunID} had {qualifying.Length} findings at or above " +
+                    $"Sentinel scan #{run.RunId} had {qualifying.Length} findings at or above " +
                     $"{threshold} severity; {suppressed} not written to the event log (MaxEntriesPerScan={cap}). " +
                     $"Full list is available in the RefinedElement_SentinelFinding table.");
         }

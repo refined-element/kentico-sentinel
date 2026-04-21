@@ -170,6 +170,18 @@ public class SentinelScanDetailPage(
     [PageCommand(Permission = SystemPermissions.UPDATE)]
     public async Task<ICommandResponse<AckMutationResponse>> SetAckState(AckMutationData data)
     {
+        // Validate fingerprint BEFORE handing to the service — ackService.Upsert throws
+        // ArgumentException on blank fingerprints and that would escape as a 500. Return a
+        // clean failure result instead so the admin UI can render the error inline.
+        if (data is null || string.IsNullOrWhiteSpace(data.Fingerprint))
+        {
+            return ResponseFrom(new AckMutationResponse
+            {
+                Success = false,
+                Message = "Finding fingerprint is required.",
+            });
+        }
+
         var user = await userAccessor.Get();
         if (user is null)
         {

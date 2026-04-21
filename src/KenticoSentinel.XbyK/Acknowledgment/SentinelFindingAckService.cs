@@ -149,8 +149,13 @@ internal sealed class SentinelFindingAckService(
     }
 
     private SentinelFindingAckInfo? LoadRow(string fingerprint) =>
+        // Order by AckedAt desc to pick the most recently-set row when duplicates exist (the
+        // concurrent-insert edge case GetAll already defends against). Without an explicit
+        // OrderBy + TopN(1), the "picked" row is nondeterministic — Upsert could update an
+        // arbitrary stale duplicate while the real current ack stays untouched.
         ackProvider.Get()
             .WhereEquals(nameof(SentinelFindingAckInfo.SentinelFindingAckFingerprintHash), fingerprint)
+            .OrderByDescending(nameof(SentinelFindingAckInfo.SentinelFindingAckAckedAt))
             .TopN(1)
             .FirstOrDefault();
 
