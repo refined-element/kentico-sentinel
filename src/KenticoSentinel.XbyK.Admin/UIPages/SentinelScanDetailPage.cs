@@ -230,17 +230,22 @@ public class SentinelScanDetailPage(
         // built from this same collection. Without a pre-dedupe, a payload with duplicate
         // fingerprints would produce: (a) `written < valid.Length` because the service merges
         // them, and (b) duplicate entries in Updates[], both of which desync the client UI.
-        var valid = data.Fingerprints
+        //
+        // Track malformed vs duplicate separately so the response message is accurate — saying
+        // "N skipped — malformed" when the real cause was duplication would send an admin on a
+        // goose chase looking for bad data.
+        var wellFormed = data.Fingerprints
             .Where(FingerprintFormat.IsValid)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToArray();
-        var skipped = data.Fingerprints.Length - valid.Length;
+        var malformedCount = data.Fingerprints.Length - wellFormed.Length;
+        var valid = wellFormed.Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+        var duplicateCount = wellFormed.Length - valid.Length;
         if (valid.Length == 0)
         {
             return ResponseFrom(new BulkAckResponse
             {
                 Success = false,
-                Message = "No valid fingerprints in request — all entries were malformed.",
+                Message = "No valid fingerprints in request — all entries were malformed or duplicates.",
                 RequestedCount = data.Fingerprints.Length,
             });
         }
@@ -299,7 +304,16 @@ public class SentinelScanDetailPage(
             })
             .ToArray();
 
-        var skippedSuffix = skipped > 0 ? $" ({skipped} skipped — malformed fingerprint)" : string.Empty;
+        // Report malformed vs duplicate separately when present so the admin can act on the
+        // information: malformed suggests client-side data corruption; duplicate suggests a
+        // UI bug where the same row was added to the selection twice.
+        var skippedSuffix = (malformedCount, duplicateCount) switch
+        {
+            (0, 0) => string.Empty,
+            ( > 0, 0) => $" ({malformedCount} skipped — malformed fingerprint)",
+            (0, > 0) => $" ({duplicateCount} skipped — duplicate)",
+            _ => $" ({malformedCount} malformed, {duplicateCount} duplicate skipped)",
+        };
         return ResponseFrom(new BulkAckResponse
         {
             Success = true,
