@@ -61,7 +61,7 @@ public class SentinelModuleInstaller(
                 "Sentinel",
                 "DEFAULT_SCHEDULE_SKIPPED",
                 ex,
-                "Could not upsert the default Sentinel scheduled-task row. " +
+                "Could not create the default Sentinel scheduled-task row. " +
                 "This is non-fatal — Sentinel installed its tables and the task class is " +
                 "registered; an admin can still create the scheduled task manually in " +
                 "Configuration → Scheduled tasks (task implementation/display name = " +
@@ -213,17 +213,26 @@ public class SentinelModuleInstaller(
     }
 
     /// <summary>
-    /// Upserts a disabled <c>CMS_ScheduledTask</c> row for <see cref="SentinelScanTask"/> so
-    /// fresh installs surface the task in the Scheduled Tasks admin app with one click to enable,
-    /// instead of forcing the admin to fill a multi-field "New task" form. Idempotent: if a row
-    /// with the matching identifier already exists (manual or from a prior install), we leave it
-    /// alone — admins may have customized the display name, cadence, or enabled state.
+    /// Ensures a disabled <c>CMS_ScheduledTask</c> row exists for <see cref="SentinelScanTask"/>
+    /// on fresh installs so the task surfaces in the Scheduled Tasks admin app with one click to
+    /// enable, instead of forcing the admin to fill a multi-field "New task" form. Creates-once:
+    /// if a row with the matching identifier already exists (manual or from a prior install) we
+    /// leave it alone — admins may have customized the display name, cadence, or enabled state,
+    /// and we do NOT want to overwrite their changes on a cold restart.
     ///
     /// Created disabled with no interval set. Admins pick cadence + enable via the UI.
     /// We intentionally leave ScheduledTaskConfigurationInterval unset — the pipe-delimited DB
     /// format is not part of Kentico's public API, and Kentico's Scheduled Tasks form requires
     /// the admin to pick an interval when they edit the row, which is the expected workflow.
     /// </summary>
+    /// <remarks>
+    /// Concurrency note: two app instances starting at the same time could both observe "no row"
+    /// and both attempt to insert. The outer <c>TryInstallDefaultScheduledTask</c> wraps this
+    /// method in a try/catch that logs DEFAULT_SCHEDULE_SKIPPED; if the second insert races in,
+    /// it's harmless — admin sees either one row (winner) or two rows that both route to the
+    /// same SentinelScanTask, and they can delete the dupe in the admin UI. The concern is
+    /// logged-visible rather than silently corrupting state.
+    /// </remarks>
     private void InstallDefaultScheduledTask()
     {
         // WhereEquals on the discriminating Identifier column covers both "never installed" and
