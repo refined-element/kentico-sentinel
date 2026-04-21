@@ -107,7 +107,15 @@ public class SentinelContactPage(
             .ToList();
 
         var report = BuildReport(run, findings);
-        var submission = QuoteSanitizer.Sanitize(report, data.ContactEmail, data.IncludeContext);
+        // Sanitizer returns the base submission (counts + findings, context-stripped per flag);
+        // enrich it with the admin-supplied contact metadata via init-only properties that are
+        // ignored by older consumers of QuoteSubmission.
+        var submission = QuoteSanitizer.Sanitize(report, data.ContactEmail, data.IncludeContext) with
+        {
+            ContactName = string.IsNullOrWhiteSpace(data.ContactName) ? null : data.ContactName.Trim(),
+            Company = string.IsNullOrWhiteSpace(data.Company) ? null : data.Company.Trim(),
+            Message = string.IsNullOrWhiteSpace(data.Message) ? null : data.Message.Trim(),
+        };
 
         var result = await contactService.SubmitAsync(submission, cancellationToken).ConfigureAwait(false);
         return ResponseFrom(new ContactSubmitResult

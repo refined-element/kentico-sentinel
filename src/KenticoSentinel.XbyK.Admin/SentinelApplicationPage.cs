@@ -16,11 +16,12 @@ namespace RefinedElement.Kentico.Sentinel.XbyK.Admin;
 
 /// <summary>
 /// Top-level Sentinel entry in the Kentico admin left-nav. <see cref="ApplicationPage"/> is a
-/// stub — Kentico auto-redirects the admin to the first registered sub-page
-/// (<see cref="UIPages.ScanHistoryListingPage"/>), so this class has no body or override surface.
-/// The attribute above registers the application with the admin shell; the category
-/// (<see cref="BaseApplicationCategories.CONFIGURATION"/>) places it alongside other ops tools
-/// like Scheduled tasks and Event log — where admins already look when something is wrong.
+/// stub — Kentico auto-redirects the admin to the first registered sub-page, which by order is
+/// <see cref="UIPages.SentinelDashboardPage"/> (ordered at <c>UIPageOrder.First - 1</c>). The
+/// class has no body or override surface. The attribute above registers the application with the
+/// admin shell; the category (<see cref="BaseApplicationCategories.CONFIGURATION"/>) places it
+/// alongside other ops tools like Scheduled tasks and Event log — where admins already look when
+/// something is wrong.
 /// </summary>
 [UIPermission(SystemPermissions.VIEW)]
 public class SentinelApplicationPage : ApplicationPage

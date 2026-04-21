@@ -122,6 +122,36 @@ public class AdminRegistrationTests
     }
 
     [Fact]
+    public void Settings_page_uses_custom_template()
+    {
+        var page = AdminAssembly.GetCustomAttributes<UIPageAttribute>()
+            .Single(p => p.Type == typeof(SentinelSettingsPage));
+        Assert.Equal(typeof(SentinelApplicationPage), page.ParentType);
+        Assert.Equal("settings", page.Slug);
+        Assert.Equal("@refinedelement/sentinel-admin/Settings", page.TemplateName);
+    }
+
+    [Fact]
+    public void Scan_detail_page_uses_custom_template()
+    {
+        var page = AdminAssembly.GetCustomAttributes<UIPageAttribute>()
+            .Single(p => p.Type == typeof(SentinelScanDetailPage));
+        Assert.Equal(typeof(SentinelApplicationPage), page.ParentType);
+        Assert.Equal("scan-detail", page.Slug);
+        Assert.Equal("@refinedelement/sentinel-admin/ScanDetail", page.TemplateName);
+    }
+
+    [Fact]
+    public void Diff_page_uses_custom_template()
+    {
+        var page = AdminAssembly.GetCustomAttributes<UIPageAttribute>()
+            .Single(p => p.Type == typeof(SentinelDiffPage));
+        Assert.Equal(typeof(SentinelApplicationPage), page.ParentType);
+        Assert.Equal("diff", page.Slug);
+        Assert.Equal("@refinedelement/sentinel-admin/Diff", page.TemplateName);
+    }
+
+    [Fact]
     public void Sentinel_listing_pages_are_siblings_under_the_same_parent()
     {
         var parents = AdminAssembly.GetCustomAttributes<UIPageAttribute>()
