@@ -35,6 +35,20 @@ internal sealed class SentinelContactService(
         ArgumentNullException.ThrowIfNull(submission);
 
         var endpoint = ResolveEndpoint();
+
+        // Validate BEFORE handing to HttpClient. PostAsJsonAsync throws UriFormatException /
+        // InvalidOperationException for malformed URLs and those aren't caught below — they'd
+        // escape our "always return a QuoteResult on failure" contract. An admin with a typo'd
+        // Sentinel:Contact:Endpoint should see a clean failure result, not a stack trace.
+        if (!Uri.TryCreate(endpoint, UriKind.Absolute, out var uri) ||
+            (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))
+        {
+            logger.LogWarning(
+                "Sentinel contact: Sentinel:Contact:Endpoint is not a valid absolute http(s) URL. Submission aborted.");
+            return new QuoteResult(false, 0, null,
+                "Sentinel:Contact:Endpoint is not a valid absolute http(s) URL. Update appsettings and retry.");
+        }
+
         logger.LogInformation(
             "Sentinel contact: submitting quote for {FindingsCount} findings to {Host}.",
             submission.Findings.Count,

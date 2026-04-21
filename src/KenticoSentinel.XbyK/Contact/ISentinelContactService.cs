@@ -18,7 +18,14 @@ public interface ISentinelContactService
     /// <param name="cancellationToken">Observed between the HTTP call and the response read;
     /// honors the caller's cancellation signal.</param>
     /// <returns>A <see cref="QuoteResult"/> containing the HTTP status and any server-returned
-    /// body. Does not throw on non-success HTTP statuses — inspect <c>Success</c> on the
-    /// returned result.</returns>
+    /// body. Does not throw on non-success HTTP statuses, transport errors, or request timeouts
+    /// — inspect <c>Success</c> on the returned result.
+    /// <para>
+    /// <b>Cancellation is the one exception.</b> If <paramref name="cancellationToken"/> is
+    /// cancelled (caller navigated away, parent operation aborted), the implementation rethrows
+    /// <see cref="OperationCanceledException"/> so async callers can unwind cleanly rather than
+    /// receive a misleading "timed out" result. Callers should either let it propagate or catch
+    /// it explicitly if they want to distinguish cancellation from other failures.
+    /// </para></returns>
     Task<QuoteResult> SubmitAsync(QuoteSubmission submission, CancellationToken cancellationToken);
 }

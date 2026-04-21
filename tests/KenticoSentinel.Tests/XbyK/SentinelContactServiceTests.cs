@@ -128,6 +128,35 @@ public class SentinelContactServiceTests
         await Assert.ThrowsAsync<ArgumentNullException>(() => service.SubmitAsync(null!, CancellationToken.None));
     }
 
+    [Theory]
+    [InlineData("not-a-url")]
+    [InlineData("   ")] // whitespace-only; ResolveEndpoint treats it as "no override" but we also
+                       // defend against a URL with only whitespace if someone sets a literal space
+    [InlineData("ftp://files.example.com/submit")] // wrong scheme
+    [InlineData("/api/scanner/submit")] // relative path, missing scheme + host
+    public async Task Invalid_endpoint_url_returns_failure_instead_of_throwing(string badEndpoint)
+    {
+        // PostAsJsonAsync will throw UriFormatException / InvalidOperationException for these
+        // cases and those don't hit any of the catch blocks. Without the pre-flight validator,
+        // admins who typo Sentinel:Contact:Endpoint get a 500 instead of a clean failure result.
+        // Note: the blank-endpoint test above asserts that an empty/whitespace value falls back
+        // to QuoteClient.DefaultEndpoint — this theory only covers non-blank invalid values.
+        if (string.IsNullOrWhiteSpace(badEndpoint))
+        {
+            return; // covered by Default_endpoint_used_when_config_blank
+        }
+        var (service, captured) = ServiceWith(HttpStatusCode.OK, "unused", endpointOverride: badEndpoint);
+        var result = await service.SubmitAsync(Submission(), CancellationToken.None);
+
+        Assert.False(result.Success);
+        Assert.Equal(0, result.StatusCode);
+        Assert.NotNull(result.ErrorMessage);
+        Assert.Contains("Sentinel:Contact:Endpoint", result.ErrorMessage);
+        // Request should never have been sent — the validator short-circuits before handing to
+        // the HttpClient pipeline.
+        Assert.Null(captured.Request);
+    }
+
     // --- helpers ---
 
     private static QuoteSubmission Submission() => new(
@@ -175,7 +204,10 @@ public class SentinelContactServiceTests
 
     private sealed class CapturingHandler : HttpMessageHandler
     {
-        private readonly HttpStatusCode statusCode;
+        // Defaulting both response-shape fields at the declaration so the throw-only constructor
+        // below doesn't leave them uninitialized. Without the defaults the compiler refuses to
+        // compile either ctor under the project's nullable+treat-warnings-as-errors settings.
+        private readonly HttpStatusCode statusCode = HttpStatusCode.OK;
         private readonly string body = string.Empty;
         private readonly Exception? toThrow;
 
