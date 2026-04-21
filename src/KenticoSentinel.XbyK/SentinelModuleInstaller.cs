@@ -39,10 +39,12 @@ public class SentinelModuleInstaller(
     /// <summary>
     /// Isolates default-task creation from the rest of the installer. The scheduled task row is
     /// a UX convenience (saves the admin from opening "New scheduled task" on fresh installs) —
-    /// not a correctness requirement. If Kentico adds column-level validation we haven't
-    /// anticipated, or if the provider isn't available in some embedding, log a clear warning
-    /// so the admin knows to create the task manually, then return — don't fail the whole
-    /// install over it.
+    /// not a correctness requirement. Kentico's Info framework always registers the injected
+    /// <see cref="ScheduledTaskConfigurationInfo"/> provider so DI resolution itself is safe; the
+    /// guard covers runtime failures — column-level validation Kentico may add in a future
+    /// refresh, a transient DB issue during startup, or an unexpected exception from the
+    /// provider's Set. Any failure logs a clear DEFAULT_SCHEDULE_SKIPPED warning so the admin
+    /// knows to create the task manually, and the rest of the install continues.
     /// </summary>
     private void TryInstallDefaultScheduledTask()
     {
