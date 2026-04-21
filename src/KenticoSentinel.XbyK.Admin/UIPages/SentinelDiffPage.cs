@@ -76,20 +76,35 @@ public class SentinelDiffPage(
         var before = LoadFindings(data.BeforeRunId);
         var after = LoadFindings(data.AfterRunId);
 
-        var beforeByFingerprint = before.ToDictionary(f => f.SentinelFindingFingerprintHash, StringComparer.OrdinalIgnoreCase);
-        var afterByFingerprint = after.ToDictionary(f => f.SentinelFindingFingerprintHash, StringComparer.OrdinalIgnoreCase);
+        // HashSet of fingerprints is enough for presence checks — we don't need the full row on
+        // the lookup side. Using a set also sidesteps the ToDictionary-throws-on-dupes case:
+        // fingerprints are stable but not guaranteed unique within a scan (checks can emit
+        // multiple findings whose location normalizes to the same hash), and duplicate rows in
+        // the DB would otherwise crash this page on every render.
+        var beforeHashes = new HashSet<string>(
+            before.Select(f => f.SentinelFindingFingerprintHash),
+            StringComparer.OrdinalIgnoreCase);
+        var afterHashes = new HashSet<string>(
+            after.Select(f => f.SentinelFindingFingerprintHash),
+            StringComparer.OrdinalIgnoreCase);
 
+        // Dedupe the projection to one row per fingerprint for the display payload; presence is
+        // what matters for the categorization, and the admin doesn't need to see the same
+        // finding twice in a column.
         var resolved = before
-            .Where(f => !afterByFingerprint.ContainsKey(f.SentinelFindingFingerprintHash))
-            .Select(ToDiff)
+            .Where(f => !afterHashes.Contains(f.SentinelFindingFingerprintHash))
+            .GroupBy(f => f.SentinelFindingFingerprintHash, StringComparer.OrdinalIgnoreCase)
+            .Select(g => ToDiff(g.First()))
             .ToArray();
         var introduced = after
-            .Where(f => !beforeByFingerprint.ContainsKey(f.SentinelFindingFingerprintHash))
-            .Select(ToDiff)
+            .Where(f => !beforeHashes.Contains(f.SentinelFindingFingerprintHash))
+            .GroupBy(f => f.SentinelFindingFingerprintHash, StringComparer.OrdinalIgnoreCase)
+            .Select(g => ToDiff(g.First()))
             .ToArray();
         var stillOpen = after
-            .Where(f => beforeByFingerprint.ContainsKey(f.SentinelFindingFingerprintHash))
-            .Select(ToDiff)
+            .Where(f => beforeHashes.Contains(f.SentinelFindingFingerprintHash))
+            .GroupBy(f => f.SentinelFindingFingerprintHash, StringComparer.OrdinalIgnoreCase)
+            .Select(g => ToDiff(g.First()))
             .ToArray();
 
         return Task.FromResult(ResponseFrom(new DiffResponse

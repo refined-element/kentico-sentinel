@@ -34,10 +34,15 @@ internal sealed class SentinelFindingAckService(
             .WhereIn(nameof(SentinelFindingAckInfo.SentinelFindingAckFingerprintHash), hashes)
             .ToList();
 
+        // Defensive group-by: duplicate ack rows for the same fingerprint can appear from
+        // concurrent upserts, manual DB edits, or historical bugs. Picking the most recently
+        // acked row keeps dashboard / scan-detail pages rendering — losing a stale ack is
+        // preferable to throwing on every page load the way a naked ToDictionary would.
         return rows
+            .GroupBy(r => r.SentinelFindingAckFingerprintHash, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(
-                r => r.SentinelFindingAckFingerprintHash,
-                ToAck,
+                g => g.Key,
+                g => ToAck(g.OrderByDescending(r => r.SentinelFindingAckAckedAt).First()),
                 StringComparer.OrdinalIgnoreCase);
     }
 
@@ -99,17 +104,26 @@ internal sealed class SentinelFindingAckService(
 
     private static FindingAck ToAck(SentinelFindingAckInfo row)
     {
+        var isSnoozedNow = row.SentinelFindingAckState == StateSnoozed
+            && row.SentinelFindingAckSnoozeUntil > DateTime.UtcNow;
         var state = row.SentinelFindingAckState switch
         {
             StateAcknowledged => AckState.Acknowledged,
-            StateSnoozed when row.SentinelFindingAckSnoozeUntil > DateTime.UtcNow => AckState.Snoozed,
+            StateSnoozed when isSnoozedNow => AckState.Snoozed,
             StateSnoozed => AckState.Active, // snooze expired — natural reversion without cleanup job
             _ => AckState.Active,
         };
+        // Only surface SnoozeUntil while the snooze is still active. Once it expires the finding
+        // reports Active; leaving a non-null SnoozeUntil on an Active result would confuse the
+        // UI ("looks snoozed but behaves active"). Acknowledged is permanent so never carries an
+        // expiry either.
+        var snoozeUntil = isSnoozedNow && row.SentinelFindingAckSnoozeUntil != default
+            ? DateTime.SpecifyKind(row.SentinelFindingAckSnoozeUntil, DateTimeKind.Utc)
+            : (DateTime?)null;
         return new FindingAck(
             Fingerprint: row.SentinelFindingAckFingerprintHash,
             State: state,
-            SnoozeUntil: row.SentinelFindingAckSnoozeUntil == default ? null : DateTime.SpecifyKind(row.SentinelFindingAckSnoozeUntil, DateTimeKind.Utc),
+            SnoozeUntil: snoozeUntil,
             UserId: row.SentinelFindingAckUserID,
             Note: string.IsNullOrWhiteSpace(row.SentinelFindingAckNote) ? null : row.SentinelFindingAckNote,
             AckedAt: DateTime.SpecifyKind(row.SentinelFindingAckAckedAt, DateTimeKind.Utc));

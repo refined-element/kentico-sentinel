@@ -75,7 +75,19 @@ public class SentinelScanDetailPage(
     public async Task<ICommandResponse<AckMutationResponse>> SetAckState(AckMutationData data)
     {
         var user = await userAccessor.Get();
-        var userId = user?.UserID ?? 0;
+        if (user is null)
+        {
+            // Don't persist an ack attributed to user 0 — kills auditability and could conflict
+            // with future assumptions about who dismissed what. UIEvaluatePermission should
+            // block unauthenticated access already; defence in depth in case something slips
+            // through.
+            return ResponseFrom(new AckMutationResponse
+            {
+                Success = false,
+                Message = "Cannot record an acknowledgment without an authenticated admin user.",
+            });
+        }
+        var userId = user.UserID;
 
         switch (data.Action)
         {
@@ -83,9 +95,21 @@ public class SentinelScanDetailPage(
                 ackService.Acknowledge(data.Fingerprint, userId, data.Note);
                 break;
             case "snooze":
-                if (!DateTime.TryParse(data.SnoozeUntilUtc, out var until))
+                // Client sends an ISO-8601 round-trip string (Date.toISOString() on the JS side).
+                // Parse STRICTLY with the "O" format + RoundtripKind so a server culture that
+                // uses dd/MM/yyyy can't swap month and day on us.
+                if (!DateTime.TryParseExact(
+                        data.SnoozeUntilUtc,
+                        "O",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.RoundtripKind,
+                        out var until))
                 {
-                    return ResponseFrom(new AckMutationResponse { Success = false, Message = "Invalid snooze date." });
+                    return ResponseFrom(new AckMutationResponse
+                    {
+                        Success = false,
+                        Message = "Invalid snooze date — expected ISO-8601 round-trip format.",
+                    });
                 }
                 ackService.Snooze(data.Fingerprint, until, userId, data.Note);
                 break;
@@ -154,7 +178,10 @@ public class SentinelScanDetailPage(
             Run = new ScanSummaryDto
             {
                 RunId = run.SentinelScanRunID,
-                StartedAt = run.SentinelScanRunStartedAt.ToString("O"),
+                // SQL datetime round-trips as DateTimeKind.Unspecified via Kentico's Info framework;
+                // SpecifyKind(UTC) before formatting ensures the "Z" designator is present so the
+                // React client doesn't re-interpret the value in local time.
+                StartedAt = DateTime.SpecifyKind(run.SentinelScanRunStartedAt, DateTimeKind.Utc).ToString("O"),
                 Status = run.SentinelScanRunStatus,
                 Trigger = run.SentinelScanRunTrigger,
                 TotalFindings = run.SentinelScanRunTotalFindings,

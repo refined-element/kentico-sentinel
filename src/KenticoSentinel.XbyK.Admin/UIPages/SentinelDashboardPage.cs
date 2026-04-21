@@ -228,7 +228,10 @@ public class SentinelDashboardPage(
     private static ScanSummaryDto ToSummary(SentinelScanRunInfo run) => new()
     {
         RunId = run.SentinelScanRunID,
-        StartedAt = run.SentinelScanRunStartedAt.ToString("O"),
+        // Timestamps are stored as UTC via DateTime.UtcNow but SQL datetime round-trips through
+        // Kentico's Info framework as DateTimeKind.Unspecified — without SpecifyKind, ToString("O")
+        // omits the "Z" designator and the React client interprets the value as local time.
+        StartedAt = DateTime.SpecifyKind(run.SentinelScanRunStartedAt, DateTimeKind.Utc).ToString("O"),
         Status = run.SentinelScanRunStatus,
         Trigger = run.SentinelScanRunTrigger,
         TotalFindings = run.SentinelScanRunTotalFindings,
