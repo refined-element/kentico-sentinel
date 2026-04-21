@@ -493,6 +493,11 @@ public class SentinelScanDetailPage(
     /// per-finding render loop stays O(1) — querying per-finding would be N round-trips and on
     /// a scan with 500 findings that's a visible freeze.
     /// </summary>
+    // SQL Server's 2100-parameter cap bites hard when a mature install has years of scan
+    // history — a single fingerprint can appear in hundreds of scan runs. Chunk at 1000 so
+    // even a large scan-detail load stays well under the cap.
+    private const int SqlInClauseBatchSize = 1_000;
+
     private Dictionary<string, FingerprintHistory> BuildFingerprintHistory(string[] fingerprints)
     {
         if (fingerprints.Length == 0)
@@ -503,22 +508,12 @@ public class SentinelScanDetailPage(
         // Pull every finding that shares any of these fingerprints, along with its scan-run
         // start time. Grouping happens in memory because Kentico's ObjectQuery doesn't expose
         // GROUP BY on the IInfoProvider<T> surface — but the JOIN via scan-run ID is cheap
-        // because we fetch only the columns we aggregate on.
-        var rows = findingProvider.Get()
-            .WhereIn(nameof(SentinelFindingInfo.SentinelFindingFingerprintHash), fingerprints)
-            .Columns(
-                nameof(SentinelFindingInfo.SentinelFindingFingerprintHash),
-                nameof(SentinelFindingInfo.SentinelFindingScanRunID))
-            .ToList();
+        // because we fetch only the columns we aggregate on. Both IN-clause lookups are
+        // batched below so a large fingerprint/scan set can't blow past SQL's parameter cap.
+        var rows = QueryFindingsInBatches(fingerprints);
 
         var scanIds = rows.Select(r => r.SentinelFindingScanRunID).Distinct().ToArray();
-        var scanStartTimes = scanRunProvider.Get()
-            .WhereIn(nameof(SentinelScanRunInfo.SentinelScanRunID), scanIds)
-            .Columns(
-                nameof(SentinelScanRunInfo.SentinelScanRunID),
-                nameof(SentinelScanRunInfo.SentinelScanRunStartedAt))
-            .ToList()
-            .ToDictionary(r => r.SentinelScanRunID, r => r.SentinelScanRunStartedAt);
+        var scanStartTimes = QueryScanStartTimesInBatches(scanIds);
 
         return rows
             .GroupBy(r => r.SentinelFindingFingerprintHash, StringComparer.OrdinalIgnoreCase)
@@ -535,6 +530,41 @@ public class SentinelScanDetailPage(
                         FirstSeenUtc: DateTime.SpecifyKind(firstSeen, DateTimeKind.Utc).ToString("O"));
                 },
                 StringComparer.OrdinalIgnoreCase);
+    }
+
+    private List<SentinelFindingInfo> QueryFindingsInBatches(string[] fingerprints)
+    {
+        var rows = new List<SentinelFindingInfo>(fingerprints.Length);
+        for (var offset = 0; offset < fingerprints.Length; offset += SqlInClauseBatchSize)
+        {
+            var batch = fingerprints.AsSpan(offset, Math.Min(SqlInClauseBatchSize, fingerprints.Length - offset)).ToArray();
+            rows.AddRange(findingProvider.Get()
+                .WhereIn(nameof(SentinelFindingInfo.SentinelFindingFingerprintHash), batch)
+                .Columns(
+                    nameof(SentinelFindingInfo.SentinelFindingFingerprintHash),
+                    nameof(SentinelFindingInfo.SentinelFindingScanRunID))
+                .ToList());
+        }
+        return rows;
+    }
+
+    private Dictionary<int, DateTime> QueryScanStartTimesInBatches(int[] scanIds)
+    {
+        var result = new Dictionary<int, DateTime>(scanIds.Length);
+        for (var offset = 0; offset < scanIds.Length; offset += SqlInClauseBatchSize)
+        {
+            var batch = scanIds.AsSpan(offset, Math.Min(SqlInClauseBatchSize, scanIds.Length - offset)).ToArray();
+            foreach (var run in scanRunProvider.Get()
+                .WhereIn(nameof(SentinelScanRunInfo.SentinelScanRunID), batch)
+                .Columns(
+                    nameof(SentinelScanRunInfo.SentinelScanRunID),
+                    nameof(SentinelScanRunInfo.SentinelScanRunStartedAt))
+                .ToList())
+            {
+                result[run.SentinelScanRunID] = run.SentinelScanRunStartedAt;
+            }
+        }
+        return result;
     }
 
     private readonly record struct FingerprintHistory(int ScanCount, string FirstSeenUtc);

@@ -50,6 +50,11 @@ internal sealed class SentinelFindingAckService(
     internal const string StateAcknowledged = "Acknowledged";
     internal const string StateSnoozed = "Snoozed";
 
+    // SQL Server's parameter cap is 2100 per query (including any framework-injected params).
+    // Stay well under that so WhereIn() can safely be called with an unbounded fingerprint /
+    // scan-id list: chunk the input, issue one query per chunk, merge results in memory.
+    private const int SqlInClauseBatchSize = 1_000;
+
     public FindingAck? Get(string fingerprint)
     {
         var row = LoadRow(fingerprint);
@@ -64,9 +69,9 @@ internal sealed class SentinelFindingAckService(
             return new Dictionary<string, FindingAck>(StringComparer.OrdinalIgnoreCase);
         }
 
-        var rows = ackProvider.Get()
-            .WhereIn(nameof(SentinelFindingAckInfo.SentinelFindingAckFingerprintHash), hashes)
-            .ToList();
+        // Chunk the WhereIn list — a dashboard querying the 50-scan window can pull 10k+
+        // fingerprints, which would exceed SQL Server's 2100-parameter cap on one query.
+        var rows = QueryAckRowsInBatches(hashes);
 
         // Defensive group-by: duplicate ack rows for the same fingerprint can appear from
         // concurrent upserts, manual DB edits, or historical bugs. Picking the most recently
@@ -78,6 +83,19 @@ internal sealed class SentinelFindingAckService(
                 g => g.Key,
                 g => ToAck(g.OrderByDescending(r => r.SentinelFindingAckAckedAt).First()),
                 StringComparer.OrdinalIgnoreCase);
+    }
+
+    private List<SentinelFindingAckInfo> QueryAckRowsInBatches(string[] hashes)
+    {
+        var rows = new List<SentinelFindingAckInfo>(hashes.Length);
+        for (var offset = 0; offset < hashes.Length; offset += SqlInClauseBatchSize)
+        {
+            var batch = hashes.AsSpan(offset, Math.Min(SqlInClauseBatchSize, hashes.Length - offset)).ToArray();
+            rows.AddRange(ackProvider.Get()
+                .WhereIn(nameof(SentinelFindingAckInfo.SentinelFindingAckFingerprintHash), batch)
+                .ToList());
+        }
+        return rows;
     }
 
     public void Acknowledge(string fingerprint, int userId, string? note = null) =>
@@ -139,15 +157,13 @@ internal sealed class SentinelFindingAckService(
 
     public int RevokeMany(IEnumerable<string> fingerprints)
     {
-        // Single query to fetch all matching rows, one Delete call each. Kentico's generic
-        // IInfoProvider doesn't expose bulk-delete by predicate, so we eat N round-trips —
-        // fine at the 10s-to-100s scale of a batch admin action.
+        // Batched WhereIn fetch (same parameter-cap concern as GetAll), then one Delete call
+        // each. Kentico's generic IInfoProvider doesn't expose bulk-delete by predicate, so we
+        // eat N round-trips on delete — fine at the 10s-to-100s scale of a batch admin action.
         var hashes = Deduplicate(fingerprints).ToArray();
         if (hashes.Length == 0) return 0;
 
-        var rows = ackProvider.Get()
-            .WhereIn(nameof(SentinelFindingAckInfo.SentinelFindingAckFingerprintHash), hashes)
-            .ToList();
+        var rows = QueryAckRowsInBatches(hashes);
         foreach (var row in rows)
         {
             ackProvider.Delete(row);

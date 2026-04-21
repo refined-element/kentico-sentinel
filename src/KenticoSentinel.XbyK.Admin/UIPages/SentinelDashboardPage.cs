@@ -195,9 +195,12 @@ public class SentinelDashboardPage(
     /// </summary>
     private TrendPointDto[] ComputeTrend()
     {
-        var since = DateTime.UtcNow.Date.AddDays(-TrendDays + 1);
+        var sinceDay = DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-TrendDays + 1);
+        // WhereGreaterOrEquals still needs a DateTime for the column compare — use midnight UTC
+        // on sinceDay so the filter is inclusive of the earliest scan on that day.
+        var sinceUtc = sinceDay.ToDateTime(TimeOnly.MinValue, DateTimeKind.Utc);
         var recent = scanRunProvider.Get()
-            .WhereGreaterOrEquals(nameof(SentinelScanRunInfo.SentinelScanRunStartedAt), since)
+            .WhereGreaterOrEquals(nameof(SentinelScanRunInfo.SentinelScanRunStartedAt), sinceUtc)
             .WhereEquals(nameof(SentinelScanRunInfo.SentinelScanRunStatus), "Completed")
             .Columns(
                 nameof(SentinelScanRunInfo.SentinelScanRunStartedAt),
@@ -210,8 +213,13 @@ public class SentinelDashboardPage(
         // otherwise an admin who kicks a manual "run now" twice on the same day produces a 2× spike
         // on the trend line that doesn't reflect an actual severity change. Failed/partial runs are
         // filtered upstream by the WhereEquals("Completed") clause so they can't skew the point.
+        //
+        // DateOnly keys (not DateTime) — DateTime carries a Kind that can drift from
+        // Unspecified (SQL round-trip) to Utc (UtcNow.Date), and while Dictionary lookups happen
+        // to still work (Equals/GetHashCode use ticks only), DateOnly removes the ambiguity
+        // entirely. Future readers don't need to know the Kind trivia.
         var byDay = recent
-            .GroupBy(r => r.SentinelScanRunStartedAt.Date)
+            .GroupBy(r => DateOnly.FromDateTime(r.SentinelScanRunStartedAt))
             .ToDictionary(
                 g => g.Key,
                 g =>
@@ -228,14 +236,15 @@ public class SentinelDashboardPage(
         var result = new TrendPointDto[TrendDays];
         for (var i = 0; i < TrendDays; i++)
         {
-            var day = since.AddDays(i);
+            var day = sinceDay.AddDays(i);
+            var label = day.ToString("yyyy-MM-dd");
             if (byDay.TryGetValue(day, out var counts))
             {
-                result[i] = new TrendPointDto { Date = day.ToString("yyyy-MM-dd"), Errors = counts.Errors, Warnings = counts.Warnings, Info = counts.Info };
+                result[i] = new TrendPointDto { Date = label, Errors = counts.Errors, Warnings = counts.Warnings, Info = counts.Info };
             }
             else
             {
-                result[i] = new TrendPointDto { Date = day.ToString("yyyy-MM-dd"), Errors = 0, Warnings = 0, Info = 0 };
+                result[i] = new TrendPointDto { Date = label, Errors = 0, Warnings = 0, Info = 0 };
             }
         }
         return result;
