@@ -62,7 +62,8 @@ public class SentinelModuleInstaller(
                 "Could not upsert the default Sentinel scheduled-task row. " +
                 "This is non-fatal — Sentinel installed its tables and the task class is " +
                 "registered; an admin can still create the scheduled task manually in " +
-                "Configuration → Scheduled tasks (task implementation = Kentico Sentinel scan).");
+                "Configuration → Scheduled tasks (task implementation/display name = " +
+                "\"Kentico Sentinel scan\", identifier = \"" + SentinelScanTask.TaskName + "\").");
         }
     }
 
