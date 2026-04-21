@@ -4,7 +4,10 @@
 
 > **Health scanner for Xperience by Kentico projects.** ESLint for XbyK.
 
-Free, open-source CLI that scans any Xperience by Kentico project and reports unused content types, orphaned content items, outdated packages, config smells, stale assets, recent `CMS_EventLog` errors, and a dozen other things the Kentico admin UI doesn't surface.
+Free, open-source. Ships in two forms:
+
+- **Embedded NuGet** for your XbyK site — installs alongside the app, runs on Kentico's scheduler, persists findings to custom tables, mirrors summaries to `CMS_EventLog`. Scans on the default cadence once the admin enables the scheduled task; email digests are opt-in (set `Sentinel:EmailDigest:Recipients`).
+- **CLI tool** for one-shot scans from a terminal or CI — same check suite, HTML + JSON reports, remote GitHub-repo mode.
 
 Built by [Refined Element](https://refinedelement.com) — Kentico Community Leaders 2025 & 2026.
 
@@ -12,13 +15,100 @@ Built by [Refined Element](https://refinedelement.com) — Kentico Community Lea
 
 | Version | Supported | Notes |
 |---------|-----------|-------|
-| **Xperience by Kentico 29+** | ✅ Full support | The tool is built for XbyK. All 11 checks run. |
+| **Xperience by Kentico 31.x** | ✅ Full support | The embedded NuGet targets 31.x explicitly. CLI also supports 29+. |
+| **Xperience by Kentico 29–30** | ✅ CLI only | Use the CLI until we ship a 29/30-compatible embedded build. |
 | Kentico Xperience 13 | ❌ Not supported | KX13 uses the legacy content tree (`CMS_Document` / `CMS_Tree`) and ASP.NET 4.x config patterns. A separate scanner would be needed; we have no plans to build one. |
 | Kentico 12 and earlier | ❌ Not supported | End of mainstream support. |
 
 If you're on KX13 or older, this tool won't help you. Please don't [open an issue](https://github.com/refined-element/kentico-sentinel/issues) asking us to backport.
 
-## Quick Start
+## Install in an XbyK site (recommended)
+
+Drop one NuGet reference into your XbyK project, wire one line in `Program.cs`, and Kentico takes care of scheduling, persistence, and the event-log mirror.
+
+### 1. Reference the package
+
+```xml
+<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK" Version="0.2.3-alpha" />
+```
+
+### 2. Register the services
+
+In `Program.cs`, after `builder.Services.AddKentico(...)`:
+
+```csharp
+using RefinedElement.Kentico.Sentinel.XbyK.DependencyInjection;
+
+builder.Services.AddKenticoSentinel(builder.Configuration);
+```
+
+### 3. Configure (optional — every field has a sensible default)
+
+In `appsettings.json`:
+
+Values below are the **actual code defaults** — omit a key entirely to get the default, override only what you want to change.
+
+```jsonc
+"Sentinel": {
+  "Enabled": true,
+  "Checks": { "Excluded": [] },
+  "RuntimeChecks": {
+    "ConnectionString": "",   // blank = reuse CMSConnectionString
+    "StaleDays": 180,
+    "EventLogDays": 30
+  },
+  "EventLogIntegration": {
+    "Enabled": true,
+    "SeverityThreshold": "Warning",   // Info | Warning | Error
+    "MaxEntriesPerScan": 50
+  },
+  "EmailDigest": {
+    "Enabled": true,                  // true by default, but digests don't SEND unless Recipients is non-empty
+    "Recipients": [],                 // add SMTP addresses here to opt in
+    "SeverityThreshold": "Warning",
+    "OnlyWhenThresholdFindings": true
+  }
+}
+```
+
+### 4. First run
+
+On the next app-start Sentinel's installer upserts three tables (`RefinedElement_SentinelScanRun`, `RefinedElement_SentinelFinding`, `RefinedElement_SentinelFindingAck`) in the CMS database. The scheduled task class registers automatically.
+
+Open **Configuration → Scheduled tasks** in Kentico admin, create a new task with implementation `RefinedElement.SentinelScan` (the dropdown list), set a cadence, save, enable. Hit **Execute now** to run the first scan.
+
+Cadence lives in Kentico's Scheduled Tasks UI — no cron config in code.
+
+### 5. Where output lands
+
+- **`RefinedElement_SentinelScanRun`** — one row per scan execution (trigger, duration, error/warning/info counts, status)
+- **`RefinedElement_SentinelFinding`** — one row per finding with a stable fingerprint for cross-scan acknowledgments
+- **`RefinedElement_SentinelFindingAck`** — one row per acknowledged/snoozed finding, keyed by fingerprint. The installer provisions the table so deploys don't need a migration step when the Admin UI (v0.3.x) lights up the ack actions; it stays empty until then.
+- **`CMS_EventLog`** — summary entry per scan (source = `Sentinel`) + one entry per finding at or above `SeverityThreshold`, up to `EventLogIntegration.MaxEntriesPerScan`; if more findings qualify, Sentinel writes a single additional summary noting the suppressed event-log entries
+
+### 6. Admin UI (optional)
+
+The companion package **`RefinedElement.Kentico.Sentinel.XbyK.Admin`** adds **Configuration → Sentinel** to the admin left-nav with:
+
+- **Dashboard** — latest scan KPIs, 30-day severity trend, recent scans, top rule offenders with inline remediation
+- **Scan history** — every scan run, sortable + filterable
+- **Findings** — every finding across scans
+- **Scan detail** — drill into a single scan, per-finding acknowledge / snooze / revoke (individual and bulk)
+- **Compare scans** — fingerprint-keyed diff: Introduced / Resolved / Still open
+- **Request a quote** — in-admin form that submits a sanitized scan snapshot to Refined Element
+- **Settings** — read-only display of effective config
+
+Install (once v0.3.0-alpha is published to NuGet):
+
+```xml
+<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK.Admin" Version="0.3.0-alpha" />
+```
+
+No extra `Program.cs` wiring — the existing `AddKenticoSentinel()` call covers DI. The admin pages surface automatically.
+
+## CLI (alternative / CI)
+
+Same checks, one-shot mode, no install in your XbyK project.
 
 ```bash
 # Prerelease until v1.0 — use --prerelease or an explicit version.
@@ -113,11 +203,15 @@ Opt in to richer context with `--include-context` for a more accurate quote.
 
 ## Roadmap
 
-**v1 (this release)** — everything above. Free, MIT-licensed, local CLI.
+**v0.2.x (current alpha)** — embedded-mode NuGet for XbyK 31.x with headless scheduled scanning, custom-table persistence, `CMS_EventLog` mirror, optional HTML email digest. CLI in parity.
 
-**v2 (paid SaaS, coming later in 2026)** — connect your XbyK site, continuous monitoring, auto-remediation (unpublish stale items, open PRs for code fixes), team dashboard, CI integration.
+**v0.3.x (next alpha)** — admin UI module: Scan history + Findings listing pages, then custom Dashboard + Contact Refined Element form. Separate `…XbyK.Admin` NuGet so headless deploys can skip it.
 
-**v3 (self-healing mode)** — analytics-driven content revisions, A/B testing via channel variants, SEO auto-remediation, broken-link repair.
+**v1.x (stable)** — API freeze. Same feature surface, no more breaking changes between minor versions. Free, MIT-licensed.
+
+**v2.x (paid add-ons)** — automatic remediation via PR bot (small refactors, dep bumps, config fixes), multi-site dashboard, Slack / PagerDuty integration. Core checks remain free.
+
+**v3.x (self-healing)** — content-side automation: unpublish stale items on a cadence, broken-link repair, SEO auto-remediation backed by your analytics.
 
 ## License
 
@@ -130,14 +224,23 @@ Issues and PRs welcome. New check ideas especially — the goal is to be **the**
 ### Dev loop
 
 ```bash
-dotnet build              # quick compile
-dotnet test               # 19 unit tests across checks, sanitizer, and runner
-./scripts/dev-reinstall.ps1  # pack + reinstall the global tool
+dotnet build KenticoSentinel.slnx   # full solution: Core + XbyK + CLI + tests
+dotnet test KenticoSentinel.slnx    # 36+ unit tests — checks, sanitizer, runner, notifiers
+./scripts/dev-reinstall.ps1         # CLI: pack + reinstall the global tool
 ./scripts/scan.ps1 -Project F:\RefinedElement\re-xbk  # verify against a real site
 ```
 
-Each check is a single class in `src/KenticoSentinel/Checks/` implementing `ICheck`. Register it in
-`Core/CheckRegistry.cs` and it ships in the next run.
+### Project layout
+
+| Project | Purpose |
+|---|---|
+| `src/KenticoSentinel.Core` | Check engine, registry, sanitizer, reporting. Framework-agnostic. |
+| `src/KenticoSentinel.XbyK` | Embedded XbyK integration — Info models, installer, scheduled task, notifiers. |
+| `src/KenticoSentinel.XbyK.Admin` | Admin UI — Dashboard, Scan history, Findings, Scan detail, Compare scans, Request-a-quote, Settings. Optional — headless deploys can skip it. |
+| `src/KenticoSentinel` | CLI tool (`sentinel`). |
+| `tests/KenticoSentinel.Tests` | xUnit tests across all packages. |
+
+Each check is a single class in `src/KenticoSentinel.Core/Checks/` implementing `ICheck`. Register it in `Core/CheckRegistry.cs` and it ships in the next run of both the CLI and the embedded scheduled task.
 
 ## Links
 
