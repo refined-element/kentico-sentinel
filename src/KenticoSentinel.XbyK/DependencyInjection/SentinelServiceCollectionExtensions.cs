@@ -68,7 +68,15 @@ public static class SentinelServiceCollectionExtensions
         services.AddHttpClient<ISentinelContactService, SentinelContactService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(30);
-            client.DefaultRequestHeaders.UserAgent.ParseAdd("KenticoSentinel-XbyK");
+            // Valid RFC 7231 User-Agent product token: `<name>/<version>` pair using the assembly
+            // InformationalVersion (matches what SentinelScanService persists on each scan run).
+            // A bare token like "KenticoSentinel-XbyK" (no slash + version) makes ParseAdd throw
+            // FormatException at typed-client construction time, which would tank the whole DI
+            // graph.
+            client.DefaultRequestHeaders.UserAgent.Add(
+                new System.Net.Http.Headers.ProductInfoHeaderValue(
+                    productName: "KenticoSentinel-XbyK",
+                    productVersion: SentinelVersion.Current));
         });
     }
 }

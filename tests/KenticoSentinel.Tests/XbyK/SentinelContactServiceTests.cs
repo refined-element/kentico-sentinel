@@ -130,8 +130,6 @@ public class SentinelContactServiceTests
 
     [Theory]
     [InlineData("not-a-url")]
-    [InlineData("   ")] // whitespace-only; ResolveEndpoint treats it as "no override" but we also
-                       // defend against a URL with only whitespace if someone sets a literal space
     [InlineData("ftp://files.example.com/submit")] // wrong scheme
     [InlineData("/api/scanner/submit")] // relative path, missing scheme + host
     public async Task Invalid_endpoint_url_returns_failure_instead_of_throwing(string badEndpoint)
@@ -139,12 +137,7 @@ public class SentinelContactServiceTests
         // PostAsJsonAsync will throw UriFormatException / InvalidOperationException for these
         // cases and those don't hit any of the catch blocks. Without the pre-flight validator,
         // admins who typo Sentinel:Contact:Endpoint get a 500 instead of a clean failure result.
-        // Note: the blank-endpoint test above asserts that an empty/whitespace value falls back
-        // to QuoteClient.DefaultEndpoint — this theory only covers non-blank invalid values.
-        if (string.IsNullOrWhiteSpace(badEndpoint))
-        {
-            return; // covered by Default_endpoint_used_when_config_blank
-        }
+        // Blank/whitespace values are covered separately by Default_endpoint_used_when_config_blank.
         var (service, captured) = ServiceWith(HttpStatusCode.OK, "unused", endpointOverride: badEndpoint);
         var result = await service.SubmitAsync(Submission(), CancellationToken.None);
 
