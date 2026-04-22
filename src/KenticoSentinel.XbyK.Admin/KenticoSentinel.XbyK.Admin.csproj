@@ -19,6 +19,7 @@
     <PackageProjectUrl>https://github.com/refined-element/kentico-sentinel</PackageProjectUrl>
     <RepositoryUrl>https://github.com/refined-element/kentico-sentinel</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 
     <!--
       AdminOrgName identifies the org that publishes this admin client bundle. Combined with the
@@ -29,6 +30,10 @@
     -->
     <AdminOrgName>refinedelement</AdminOrgName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- References the XbyK integration package (via ProjectReference while both live in this
