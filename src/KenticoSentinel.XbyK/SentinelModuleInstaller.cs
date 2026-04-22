@@ -213,17 +213,20 @@ public class SentinelModuleInstaller(
     }
 
     /// <summary>
-    /// Ensures a disabled <c>CMS_ScheduledTask</c> row exists for <see cref="SentinelScanTask"/>
-    /// on fresh installs so the task surfaces in the Scheduled Tasks admin app with one click to
-    /// enable, instead of forcing the admin to fill a multi-field "New task" form. Creates-once:
-    /// if a row with the matching identifier already exists (manual or from a prior install) we
-    /// leave it alone — admins may have customized the display name, cadence, or enabled state,
-    /// and we do NOT want to overwrite their changes on a cold restart.
+    /// Ensures a disabled <c>CMS_ScheduledTaskConfiguration</c> row exists for
+    /// <see cref="SentinelScanTask"/> on fresh installs — backed at runtime by
+    /// <see cref="ScheduledTaskConfigurationInfo"/> via the injected provider — so the task
+    /// surfaces in the Scheduled Tasks admin app with one click to enable, instead of forcing
+    /// the admin to fill a multi-field "New task" form. Creates-once: if a row with the matching
+    /// identifier already exists (manual or from a prior install) we leave it alone — admins may
+    /// have customized the display name, cadence, or enabled state, and we do NOT want to
+    /// overwrite their changes on a cold restart.
     ///
-    /// Created disabled with no interval set. Admins pick cadence + enable via the UI.
-    /// We intentionally leave ScheduledTaskConfigurationInterval unset — the pipe-delimited DB
-    /// format is not part of Kentico's public API, and Kentico's Scheduled Tasks form requires
-    /// the admin to pick an interval when they edit the row, which is the expected workflow.
+    /// Created disabled with a sane default interval (every 24 hours). Admin can change the
+    /// cadence + enable state via the Scheduled Tasks app; we just need SOMETHING in the
+    /// Interval column because the DB schema is NOT NULL. v0.3.0/0.3.1-alpha shipped without
+    /// the default value and every install silently failed the INSERT with a NULL-constraint
+    /// violation, leaving admins with no task row at all.
     /// </summary>
     /// <remarks>
     /// Concurrency note: two app instances starting at the same time could both observe "no row"
@@ -254,7 +257,19 @@ public class SentinelModuleInstaller(
             ScheduledTaskConfigurationScheduledTaskIdentifier = SentinelScanTask.TaskName,
             ScheduledTaskConfigurationEnabled = false,
             ScheduledTaskConfigurationDeleteAfterLastRun = false,
+            ScheduledTaskConfigurationInterval = DefaultDailyInterval,
         };
         scheduledTaskProvider.Set(task);
     }
+
+    /// <summary>
+    /// Pipe-delimited interval string Kentico's scheduler parses into a "runs every 1 day,
+    /// starting at midnight" cadence. We hand-roll the format because <c>SchedulingHelper</c>
+    /// and <c>TaskInterval</c> are internal in Xperience 31.x (not in the public API surface).
+    /// Admin can override this with any cadence they want via the Scheduled Tasks admin app;
+    /// all we need is a non-null value that satisfies the DB's NOT NULL constraint. The
+    /// "day;1;HH:mm:ss" shape has been stable across the Xperience 30-31 line — verified by
+    /// inspecting existing rows in CMS_ScheduledTaskConfiguration on an active install.
+    /// </summary>
+    private const string DefaultDailyInterval = "day;1;00:00:00";
 }

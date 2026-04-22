@@ -257,26 +257,9 @@ public class SentinelScanDetailPage(
                 written = ackService.AcknowledgeMany(valid, userId, data.Note);
                 break;
             case "snooze":
-                if (!DateTime.TryParseExact(
-                        data.SnoozeUntilUtc,
-                        "O",
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        System.Globalization.DateTimeStyles.RoundtripKind,
-                        out var until))
+                if (!SnoozeDateParser.TryParse(data.SnoozeUntilUtc, DateTime.UtcNow, out var until, out var snoozeError))
                 {
-                    return ResponseFrom(new BulkAckResponse
-                    {
-                        Success = false,
-                        Message = "Invalid snooze date — expected ISO-8601 round-trip format.",
-                    });
-                }
-                if (until <= DateTime.UtcNow.AddMinutes(1))
-                {
-                    return ResponseFrom(new BulkAckResponse
-                    {
-                        Success = false,
-                        Message = "Snooze date must be at least one minute in the future.",
-                    });
+                    return ResponseFrom(new BulkAckResponse { Success = false, Message = snoozeError });
                 }
                 written = ackService.SnoozeMany(valid, until, userId, data.Note);
                 break;
@@ -367,33 +350,9 @@ public class SentinelScanDetailPage(
                 ackService.Acknowledge(data.Fingerprint, userId, data.Note);
                 break;
             case "snooze":
-                // Client sends an ISO-8601 round-trip string (Date.toISOString() on the JS side).
-                // Parse STRICTLY with the "O" format + RoundtripKind so a server culture that
-                // uses dd/MM/yyyy can't swap month and day on us.
-                if (!DateTime.TryParseExact(
-                        data.SnoozeUntilUtc,
-                        "O",
-                        System.Globalization.CultureInfo.InvariantCulture,
-                        System.Globalization.DateTimeStyles.RoundtripKind,
-                        out var until))
+                if (!SnoozeDateParser.TryParse(data.SnoozeUntilUtc, DateTime.UtcNow, out var until, out var snoozeError))
                 {
-                    return ResponseFrom(new AckMutationResponse
-                    {
-                        Success = false,
-                        Message = "Invalid snooze date — expected ISO-8601 round-trip format.",
-                    });
-                }
-                // Reject past / effectively-immediate snooze times. The finding would persist as
-                // Snoozed and then read back as Active on the very next refresh (ToAck treats an
-                // expired snooze as Active), giving the admin misleading "Snoozed" feedback for
-                // something that's already un-snoozed. One-minute grace covers clock drift.
-                if (until <= DateTime.UtcNow.AddMinutes(1))
-                {
-                    return ResponseFrom(new AckMutationResponse
-                    {
-                        Success = false,
-                        Message = "Snooze date must be at least one minute in the future.",
-                    });
+                    return ResponseFrom(new AckMutationResponse { Success = false, Message = snoozeError });
                 }
                 ackService.Snooze(data.Fingerprint, until, userId, data.Note);
                 break;
