@@ -109,7 +109,7 @@ export const SettingsTemplate = (props: SettingsClientProperties) => (
                 </li>
                 <li>
                     <strong>Scan cadence / enable:</strong>{' '}
-                    <a href={props.scheduledTasksUrl} style={{ color: COLORS.limeDark, fontWeight: 600 }}>
+                    <a href={props.scheduledTasksUrl} style={{ color: COLORS.limeText, fontWeight: 600 }}>
                         Scheduled tasks
                     </a>
                     {' — not an '}

@@ -706,7 +706,7 @@ const FindingRow = ({
                                 border: `1px solid ${COLORS.border}`,
                                 borderRadius: 4,
                                 background: 'transparent',
-                                color: COLORS.limeDark,
+                                color: COLORS.limeText,
                                 fontSize: 12,
                                 fontWeight: 600,
                                 cursor: 'pointer',

@@ -153,7 +153,7 @@ export const DashboardTemplate = (initial: DashboardClientProperties) => {
             </div>
 
             <footer style={{ marginTop: 24, padding: 16, background: COLORS.bgMuted, borderRadius: 8, fontSize: 14, color: COLORS.textMuted }}>
-                Cadence is configured in <a href={data.scheduledTasksUrl} style={{ color: COLORS.limeDark, fontWeight: 600 }}>Scheduled tasks</a>.
+                Cadence is configured in <a href={data.scheduledTasksUrl} style={{ color: COLORS.limeText, fontWeight: 600 }}>Scheduled tasks</a>.
                 Sentinel runs on whatever interval you set there — edit the row named <code>RefinedElement.SentinelScan</code> to change it or
                 click <em>Run scan now</em> above for an on-demand run.
             </footer>
@@ -347,7 +347,7 @@ const Panel = ({
                 {title}
             </h3>
             {linkText && linkHref && (
-                <a href={linkHref} style={{ fontSize: 14, color: COLORS.limeDark, textDecoration: 'none', fontWeight: 600 }}>
+                <a href={linkHref} style={{ fontSize: 14, color: COLORS.limeText, textDecoration: 'none', fontWeight: 600 }}>
                     {linkText} →
                 </a>
             )}
@@ -529,7 +529,7 @@ const TopRulesList = ({ rules }: { rules: ReadonlyArray<RuleCount> }) => {
                         >
                             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, alignItems: 'baseline' }}>
                                 <span style={{ fontFamily: 'monospace', color: COLORS.textPrimary, fontWeight: 600 }}>
-                                    <span style={{ color: COLORS.limeDark, marginRight: 6 }}>{isOpen ? '▾' : '▸'}</span>
+                                    <span style={{ color: COLORS.limeText, marginRight: 6 }}>{isOpen ? '▾' : '▸'}</span>
                                     {r.ruleId}
                                 </span>
                                 <span style={{ color: COLORS.textMuted, fontSize: 12 }}>
@@ -559,7 +559,7 @@ const TopRulesList = ({ rules }: { rules: ReadonlyArray<RuleCount> }) => {
                                 )}
                                 <a
                                     href={`/admin/sentinel/scan-detail?rule=${encodeURIComponent(r.ruleId)}`}
-                                    style={{ color: COLORS.limeDark, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}
+                                    style={{ color: COLORS.limeText, fontSize: 12, fontWeight: 600, textDecoration: 'none' }}
                                 >
                                     View {r.activeCount} active finding{r.activeCount === 1 ? '' : 's'} across recent scans →
                                 </a>
