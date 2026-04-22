@@ -19,7 +19,12 @@
     <PackageProjectUrl>https://github.com/refined-element/kentico-sentinel</PackageProjectUrl>
     <RepositoryUrl>https://github.com/refined-element/kentico-sentinel</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.0" />
