@@ -213,12 +213,14 @@ public class SentinelModuleInstaller(
     }
 
     /// <summary>
-    /// Ensures a disabled <c>CMS_ScheduledTask</c> row exists for <see cref="SentinelScanTask"/>
-    /// on fresh installs so the task surfaces in the Scheduled Tasks admin app with one click to
-    /// enable, instead of forcing the admin to fill a multi-field "New task" form. Creates-once:
-    /// if a row with the matching identifier already exists (manual or from a prior install) we
-    /// leave it alone — admins may have customized the display name, cadence, or enabled state,
-    /// and we do NOT want to overwrite their changes on a cold restart.
+    /// Ensures a disabled <c>CMS_ScheduledTaskConfiguration</c> row exists for
+    /// <see cref="SentinelScanTask"/> on fresh installs — backed at runtime by
+    /// <see cref="ScheduledTaskConfigurationInfo"/> via the injected provider — so the task
+    /// surfaces in the Scheduled Tasks admin app with one click to enable, instead of forcing
+    /// the admin to fill a multi-field "New task" form. Creates-once: if a row with the matching
+    /// identifier already exists (manual or from a prior install) we leave it alone — admins may
+    /// have customized the display name, cadence, or enabled state, and we do NOT want to
+    /// overwrite their changes on a cold restart.
     ///
     /// Created disabled with a sane default interval (every 24 hours). Admin can change the
     /// cadence + enable state via the Scheduled Tasks app; we just need SOMETHING in the
