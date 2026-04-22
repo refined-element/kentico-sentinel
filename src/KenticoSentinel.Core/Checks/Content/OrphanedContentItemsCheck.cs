@@ -26,16 +26,20 @@ public sealed class OrphanedContentItemsCheck : ICheck
     public string Category => "Content Model";
     public CheckKind Kind => CheckKind.Runtime;
 
-    public async Task<IReadOnlyList<Finding>> RunAsync(ScanContext context, CancellationToken cancellationToken)
-    {
-        var findings = new List<Finding>();
-
-        // MAX() + GROUP BY on the language-metadata join collapses multi-language items to one
-        // row keyed by ContentItemID — fires one finding per item, not per language. Using MAX
-        // on the ModifiedWhen so a still-active translation in any language keeps the item out
-        // of the unused bucket (translate-only editors shouldn't accidentally trigger deletes
-        // of content that's being maintained in one language but not the others).
-        const string sql = @"
+    /// <summary>
+    /// SQL exposed internal so tests can assert shape without a live Kentico database. The query
+    /// has two load-bearing clauses — the <c>ContentItemReferenceID IS NULL</c> filter and the
+    /// <c>HAVING MAX(ModifiedWhen)</c> staleness gate — and both need to survive any future edit.
+    ///
+    /// <para>
+    /// MAX() + GROUP BY on the language-metadata join collapses multi-language items to one row
+    /// keyed by ContentItemID (fires one finding per item, not per language). MAX on ModifiedWhen
+    /// means a still-active translation in any language keeps the item out of the unused bucket:
+    /// translate-only editors shouldn't accidentally trigger deletes of content being maintained
+    /// in one language but not others.
+    /// </para>
+    /// </summary>
+    internal const string Sql = @"
             SELECT
                 ci.ContentItemID,
                 MAX(COALESCE(m.ContentItemLanguageMetadataDisplayName, ci.ContentItemName)) AS DisplayName,
@@ -55,9 +59,13 @@ public sealed class OrphanedContentItemsCheck : ICheck
                OR MAX(m.ContentItemLanguageMetadataModifiedWhen) IS NULL
             ORDER BY MAX(m.ContentItemLanguageMetadataModifiedWhen) ASC;";
 
+    public async Task<IReadOnlyList<Finding>> RunAsync(ScanContext context, CancellationToken cancellationToken)
+    {
+        var findings = new List<Finding>();
+
         await using var connection = new SqlConnection(context.ConnectionString);
         await connection.OpenAsync(cancellationToken).ConfigureAwait(false);
-        await using var command = new SqlCommand(sql, connection);
+        await using var command = new SqlCommand(Sql, connection);
         command.Parameters.AddWithValue("@StaleDays", context.StaleDays);
         await using var reader = await command.ExecuteReaderAsync(cancellationToken).ConfigureAwait(false);
 
