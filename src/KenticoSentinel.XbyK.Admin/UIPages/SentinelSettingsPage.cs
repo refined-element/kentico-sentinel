@@ -269,13 +269,30 @@ public class SentinelSettingsPage(
                 return (false, $"Rule ID '{ruleId}' is invalid — must be 1–32 non-blank characters.");
             }
         }
-        if (!string.IsNullOrWhiteSpace(data.ScheduleIntervalRaw)
-            && !SchedulePresets.Any(p => p.IntervalRaw == data.ScheduleIntervalRaw))
+        // Schedule validation accepts three shapes:
+        //   - empty / null → "don't change cadence" (admin is only editing other settings)
+        //   - a preset value → trivially valid
+        //   - the CURRENT db value (even if custom, e.g. hand-tuned 'day;3;00:00:00') → valid
+        //     so operators with an existing custom cadence can Save without being forced onto
+        //     a preset. Anything else is rejected to avoid arbitrary free-text injection.
+        if (!string.IsNullOrWhiteSpace(data.ScheduleIntervalRaw))
         {
-            return (false, "Schedule preset must match one of the known presets.");
+            var isPreset = SchedulePresets.Any(p => p.IntervalRaw == data.ScheduleIntervalRaw);
+            var isCurrentDbValue = GetCurrentScheduleIntervalRaw() == data.ScheduleIntervalRaw;
+            if (!isPreset && !isCurrentDbValue)
+            {
+                return (false, "Schedule preset must match a known preset or the current scheduled-task interval.");
+            }
         }
         return (true, null);
     }
+
+    private string? GetCurrentScheduleIntervalRaw() =>
+        scheduledTaskProvider.Get()
+            .WhereEquals(nameof(ScheduledTaskConfigurationInfo.ScheduledTaskConfigurationScheduledTaskIdentifier), SentinelScanTask.TaskName)
+            .TopN(1)
+            .FirstOrDefault()?
+            .ScheduledTaskConfigurationInterval;
 
     private string? TryApplySchedulePreset(string? intervalRaw, bool enabled)
     {
@@ -287,7 +304,25 @@ public class SentinelSettingsPage(
                 .FirstOrDefault();
             if (task is null)
             {
-                return "Scheduled task row not found — skipped schedule update. Create it via Scheduled tasks.";
+                // No task row yet — create one using the admin's chosen cadence (or a daily
+                // default if they left the field empty). Matches the UI hint "save settings
+                // here to let Sentinel pick the default" — skipping the INSERT would have
+                // been a lie. See SentinelModuleInstaller.DefaultDailyInterval for the rest
+                // of the NOT NULL columns we populate.
+                task = new ScheduledTaskConfigurationInfo
+                {
+                    ScheduledTaskConfigurationName = SentinelScanTask.TaskName,
+                    ScheduledTaskConfigurationDisplayName = "Kentico Sentinel scan",
+                    ScheduledTaskConfigurationScheduledTaskIdentifier = SentinelScanTask.TaskName,
+                    ScheduledTaskConfigurationEnabled = enabled,
+                    ScheduledTaskConfigurationDeleteAfterLastRun = false,
+                    ScheduledTaskConfigurationInterval = string.IsNullOrWhiteSpace(intervalRaw) ? "day;1;00:00:00" : intervalRaw,
+                    ScheduledTaskConfigurationData = string.Empty,
+                    ScheduledTaskConfigurationGUID = Guid.NewGuid(),
+                    ScheduledTaskConfigurationLastModified = DateTime.UtcNow,
+                };
+                scheduledTaskProvider.Set(task);
+                return null;
             }
             if (!string.IsNullOrWhiteSpace(intervalRaw))
             {

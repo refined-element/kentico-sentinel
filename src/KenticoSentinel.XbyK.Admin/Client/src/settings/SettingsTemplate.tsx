@@ -438,19 +438,32 @@ const SchedulePresetSelect = ({
     value: string;
     onChange: (v: string) => void;
     presets: ReadonlyArray<SchedulePresetDto>;
-}) => (
-    <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, width: 260 }}>
-        {!presets.some((p) => p.intervalRaw === value) && value && (
-            // Show the current value as a pinned "custom" option so the admin doesn't accidentally
-            // clobber a hand-tuned cadence just by clicking Save. If they want to switch to a
-            // preset, they pick one; custom stays intact otherwise.
-            <option value={value}>Custom: {value}</option>
-        )}
-        {presets.map((p) => (
-            <option key={p.intervalRaw} value={p.intervalRaw}>{p.label}</option>
-        ))}
-    </select>
-);
+}) => {
+    // Three shapes this select has to handle without ambiguity between "what the <select>
+    // shows" and "what's in state":
+    //   1. Value matches a preset → render the preset list, that option selected
+    //   2. Value is a custom DB cadence (hand-tuned in Scheduled Tasks) → pin a "Custom: X"
+    //      option so Save preserves it rather than clobbering the user's hand-tune
+    //   3. Value is empty (no task row yet) → pin a "Keep current / pick a cadence" sentinel
+    //      option with value="" so the <select> visually matches state. Server-side this means
+    //      "don't change the cadence" — and since there's no row yet, Save will create one
+    //      using the daily default (see TryApplySchedulePreset).
+    const isEmpty = !value;
+    const isCustom = !!value && !presets.some((p) => p.intervalRaw === value);
+    return (
+        <select value={value} onChange={(e) => onChange(e.target.value)} style={{ ...inputStyle, width: 260 }}>
+            {isEmpty && (
+                <option value="">Keep current / pick a cadence…</option>
+            )}
+            {isCustom && (
+                <option value={value}>Custom: {value}</option>
+            )}
+            {presets.map((p) => (
+                <option key={p.intervalRaw} value={p.intervalRaw}>{p.label}</option>
+            ))}
+        </select>
+    );
+};
 
 const ExcludedChecksList = ({
     knownRules,

@@ -2,6 +2,8 @@ using System.Text.Json;
 
 using CMS.DataEngine;
 
+using Microsoft.Extensions.DependencyInjection;
+
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelSettingsOverride;
 
 namespace RefinedElement.Kentico.Sentinel.XbyK.SettingsOverride;
@@ -11,13 +13,21 @@ namespace RefinedElement.Kentico.Sentinel.XbyK.SettingsOverride;
 /// enforced by always targeting <c>OrderBy(ID).TopN(1)</c> on read/write and deleting any
 /// stragglers on save. If a concurrent insert slips in (two admins saving at once), the loser's
 /// row becomes orphaned and is cleaned up by the next save.
+///
+/// <para>
+/// Lifetime: Singleton. The consumer of this abstraction —
+/// <see cref="SentinelOptionsOverrideApplier"/> — must itself be resolvable from the root
+/// provider because <c>IConfigureOptions</c> / <c>IPostConfigureOptions</c> are discovered
+/// when <c>IOptions.Value</c> is cached at the singleton scope. Holding an
+/// <c>IInfoProvider&lt;T&gt;</c> directly would fail the scope-validation check; we ask the
+/// <see cref="IServiceScopeFactory"/> for a fresh scope per call instead. The scope is cheap
+/// (no DB connection until <c>provider.Get()</c> is called) and disposed at the end of the
+/// operation, so we don't leak scoped resources.
+/// </para>
 /// </summary>
 internal sealed class SentinelSettingsOverrideStore(
-    IInfoProvider<SentinelSettingsOverrideInfo> provider) : ISentinelSettingsOverrideStore
+    IServiceScopeFactory scopeFactory) : ISentinelSettingsOverrideStore
 {
-    // JSON is the serialization format for list-valued columns (ExcludedChecks, EmailRecipients).
-    // We use Kentico's Info framework for the table, not a dedicated migration, which means the
-    // column type is nvarchar(max) — perfectly fine to hold a JSON array of a few strings.
     private static readonly JsonSerializerOptions JsonOpts = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -25,13 +35,18 @@ internal sealed class SentinelSettingsOverrideStore(
 
     public SentinelSettingsSnapshot? Get()
     {
-        var row = LoadRow();
+        using var scope = scopeFactory.CreateScope();
+        var provider = scope.ServiceProvider.GetRequiredService<IInfoProvider<SentinelSettingsOverrideInfo>>();
+        var row = LoadRow(provider);
         return row is null ? null : ToSnapshot(row);
     }
 
     public void Save(SentinelSettingsSnapshot snapshot, int userId)
     {
-        var row = LoadRow() ?? new SentinelSettingsOverrideInfo
+        using var scope = scopeFactory.CreateScope();
+        var provider = scope.ServiceProvider.GetRequiredService<IInfoProvider<SentinelSettingsOverrideInfo>>();
+
+        var row = LoadRow(provider) ?? new SentinelSettingsOverrideInfo
         {
             SentinelSettingsOverrideGuid = Guid.NewGuid(),
         };
@@ -50,8 +65,7 @@ internal sealed class SentinelSettingsOverrideStore(
         row.SentinelSettingsOverrideLastModifiedAt = DateTime.UtcNow;
         provider.Set(row);
 
-        // Clean up any stragglers from a past concurrent-insert race. Keeps the single-row
-        // invariant true even if a bug slipped in somewhere.
+        // Clean up any stragglers from a past concurrent-insert race.
         var rows = provider.Get()
             .OrderBy(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideID))
             .ToList();
@@ -63,6 +77,8 @@ internal sealed class SentinelSettingsOverrideStore(
 
     public void Clear()
     {
+        using var scope = scopeFactory.CreateScope();
+        var provider = scope.ServiceProvider.GetRequiredService<IInfoProvider<SentinelSettingsOverrideInfo>>();
         var rows = provider.Get().ToList();
         foreach (var row in rows)
         {
@@ -70,7 +86,7 @@ internal sealed class SentinelSettingsOverrideStore(
         }
     }
 
-    private SentinelSettingsOverrideInfo? LoadRow() =>
+    private static SentinelSettingsOverrideInfo? LoadRow(IInfoProvider<SentinelSettingsOverrideInfo> provider) =>
         provider.Get()
             .OrderBy(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideID))
             .TopN(1)

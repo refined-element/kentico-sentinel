@@ -59,16 +59,22 @@ internal sealed class SentinelRetentionService(
             .ToArray();
 
         // Nothing to compare against — the table is empty or has fewer rows than the keep
-        // window. A WhereNotIn with an empty set would delete everything, which is the exact
-        // opposite of what we want. Abort early with a zero summary.
+        // window. Aborting early avoids the "empty keep set means delete everything" trap and
+        // saves a round-trip.
         if (keepIds.Length == 0)
         {
             return Task.FromResult(new RetentionSummary(0, 0));
         }
 
-        // Step 2: Find the doomed scan-run IDs — anything NOT in the keep set.
+        // Step 2: Find the doomed scan-run IDs via a cutoff comparison, NOT a NOT-IN over the
+        // keep set. The keep set is monotonic (top-N by ID desc = the N largest IDs), so
+        // "anything below the smallest keep ID" is equivalent to "anything not in the keep
+        // set". Using WhereLessThan dodges SQL Server's ~2100-parameter limit entirely —
+        // if an operator misconfigures MaxScanRunsToKeep to 3000, a NOT-IN query would fail
+        // with a "too many parameters" SqlException.
+        var minKeepId = keepIds.Min();
         var doomedIds = scanRunProvider.Get()
-            .WhereNotIn(nameof(SentinelScanRunInfo.SentinelScanRunID), keepIds)
+            .WhereLessThan(nameof(SentinelScanRunInfo.SentinelScanRunID), minKeepId)
             .Columns(nameof(SentinelScanRunInfo.SentinelScanRunID))
             .ToList()
             .Select(r => r.SentinelScanRunID)

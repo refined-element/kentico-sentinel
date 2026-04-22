@@ -71,10 +71,17 @@ public static class SentinelServiceCollectionExtensions
         services.AddTransient<ISentinelRetentionService, SentinelRetentionService>();
 
         // Settings-override store — reads the single-row admin-UI override and layers it on top
-        // of SentinelOptions via PostConfigure. Scoped because it holds an IInfoProvider<T>
-        // dependency that Kentico resolves per-request; the applier is Scoped for the same reason.
-        services.AddScoped<ISentinelSettingsOverrideStore, SentinelSettingsOverrideStore>();
-        services.AddScoped<IPostConfigureOptions<SentinelOptions>, SentinelOptionsOverrideApplier>();
+        // of SentinelOptions via PostConfigure.
+        //
+        // Lifetime: Singleton, not Scoped. IOptions<T>.Value is cached at the root provider
+        // scope; when resolved it invokes every IPostConfigureOptions<T>. A scoped applier
+        // registered against a root-scope resolution throws "scoped-from-root" under strict
+        // scope validation (and silently leaks scoped resources without it). We keep the store
+        // singleton-safe by creating a fresh scope per call inside the store itself (see
+        // SentinelSettingsOverrideStore — it asks IServiceScopeFactory for a scope, resolves
+        // the IInfoProvider<T> there, disposes on exit).
+        services.AddSingleton<ISentinelSettingsOverrideStore, SentinelSettingsOverrideStore>();
+        services.AddSingleton<IPostConfigureOptions<SentinelOptions>, SentinelOptionsOverrideApplier>();
 
         // Typed HttpClient for the Refined Element quote intake. 30s timeout leaves headroom for
         // KDaaS cold-start while still bounding a hung dependency — the admin UI surface is
