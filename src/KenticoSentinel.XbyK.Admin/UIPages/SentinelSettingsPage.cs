@@ -152,14 +152,17 @@ public class SentinelSettingsPage(
     /// configuration change without knowing the original values by heart.
     /// </summary>
     [PageCommand(Permission = SystemPermissions.UPDATE)]
-    public ICommandResponse<SaveSettingsResponse> ResetToDefaults()
+    public Task<ICommandResponse<SaveSettingsResponse>> ResetToDefaults()
     {
+        // Kentico's [PageCommand] dispatch requires async signatures — a synchronous return
+        // type blows up with NotSupportedException at request time. No await needed internally
+        // (the store's Clear is sync over an IInfoProvider), so we wrap in Task.FromResult.
         overrideStore.Clear();
-        return ResponseFrom(new SaveSettingsResponse
+        return Task.FromResult(ResponseFrom(new SaveSettingsResponse
         {
             Success = true,
             Message = "Override cleared. Settings reverted to appsettings values on the next scan.",
-        });
+        }));
     }
 
     private void PopulateEditableSettings(SettingsClientProperties p, SentinelOptions opts)
@@ -187,7 +190,8 @@ public class SentinelSettingsPage(
             ? opts.Contact.Endpoint
             : QuoteClient.DefaultEndpoint;
         p.ContactIncludeContextByDefault = opts.Contact.IncludeContextByDefault;
-        p.ScheduledTasksUrl = "/admin";
+        // Direct admin app URL; see SentinelDashboardPage for rationale.
+        p.ScheduledTasksUrl = "/admin/scheduled-tasks";
     }
 
     private void PopulateSchedule(SettingsClientProperties p)

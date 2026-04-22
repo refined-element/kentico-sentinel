@@ -842,13 +842,10 @@ const AckActions = ({
     ackState: string;
     onMutate: (data: { fingerprint: string; action: string; snoozeUntilUtc?: string; note?: string }) => void;
 }) => {
-    // Single-click snooze: clicking "Snooze" submits immediately with a 7-day default. The
-    // "Customize" toggle reveals the day-count dropdown + note field for operators who need a
-    // different duration. Previous flow made "Snooze" a panel-open button, and a lot of people
-    // (verified on re-xbk dogfood) thought that first click submitted — closed the row, moved on,
-    // never realized no row got written. The two-click path is preserved for intentional tweaks;
-    // the default is one click.
-    const [customizeOpen, setCustomizeOpen] = useState(false);
+    // Inline duration dropdown + single "Snooze Xd" button. Picking a different duration from
+    // the dropdown changes both state AND the button label in the same update — when they
+    // click, they submit whatever the dropdown says. No separate "Customize" button (it
+    // confused operators: felt like a mode switch for an ostensibly-default action).
     const [snoozeDays, setSnoozeDays] = useState(7);
     const [note, setNote] = useState('');
 
@@ -864,22 +861,21 @@ const AckActions = ({
         );
     }
 
-    const submitSnooze = (days: number, noteText: string) => {
+    const submitSnooze = () => {
         const until = new Date();
-        until.setUTCDate(until.getUTCDate() + days);
+        until.setUTCDate(until.getUTCDate() + snoozeDays);
         onMutate({
             fingerprint,
             action: 'snooze',
             snoozeUntilUtc: until.toISOString(),
-            note: noteText.trim() || undefined,
+            note: note.trim() || undefined,
         });
-        setCustomizeOpen(false);
         setNote('');
     };
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-            <div style={{ display: 'flex', gap: 6 }}>
+            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <Button
                     type={ButtonType.Button}
                     label="Acknowledge"
@@ -887,63 +883,48 @@ const AckActions = ({
                     color={ButtonColor.Secondary}
                     onClick={() => onMutate({ fingerprint, action: 'acknowledge', note: note.trim() || undefined })}
                 />
-                <Button
-                    type={ButtonType.Button}
-                    label="Snooze 7d"
-                    size={ButtonSize.S}
-                    color={ButtonColor.Secondary}
-                    onClick={() => submitSnooze(7, note)}
-                />
-                <Button
-                    type={ButtonType.Button}
-                    label={customizeOpen ? 'Cancel' : 'Customize…'}
-                    size={ButtonSize.S}
-                    color={ButtonColor.Secondary}
-                    onClick={() => setCustomizeOpen(!customizeOpen)}
-                />
-            </div>
-            {customizeOpen && (
-                <div
+                <select
+                    value={snoozeDays}
+                    onChange={(e) => setSnoozeDays(Number(e.target.value))}
+                    aria-label="Snooze duration"
                     style={{
-                        padding: 10,
-                        background: COLORS.bgMuted,
+                        padding: '4px 8px',
                         border: `1px solid ${COLORS.border}`,
-                        borderRadius: 6,
-                        display: 'flex',
-                        flexDirection: 'column',
-                        gap: 6,
-                        minWidth: 240,
+                        borderRadius: 4,
+                        fontSize: 13,
+                        background: COLORS.bg,
+                        color: COLORS.textPrimary,
                     }}
                 >
-                    <label style={{ fontSize: 12, color: COLORS.textMuted }}>
-                        Snooze for
-                        <select
-                            value={snoozeDays}
-                            onChange={(e) => setSnoozeDays(Number(e.target.value))}
-                            style={{ marginLeft: 6, padding: '2px 6px', border: `1px solid ${COLORS.border}`, borderRadius: 4, fontSize: 12 }}
-                        >
-                            <option value={1}>1 day</option>
-                            <option value={7}>7 days</option>
-                            <option value={30}>30 days</option>
-                            <option value={90}>90 days</option>
-                        </select>
-                    </label>
-                    <input
-                        type="text"
-                        placeholder="Optional note"
-                        value={note}
-                        onChange={(e) => setNote(e.target.value)}
-                        style={{ padding: '4px 8px', border: `1px solid ${COLORS.border}`, borderRadius: 4, fontSize: 12 }}
-                    />
-                    <Button
-                        type={ButtonType.Button}
-                        label={`Snooze ${snoozeDays}d with note`}
-                        size={ButtonSize.S}
-                        color={ButtonColor.Primary}
-                        onClick={() => submitSnooze(snoozeDays, note)}
-                    />
-                </div>
-            )}
+                    <option value={1}>1 day</option>
+                    <option value={7}>7 days</option>
+                    <option value={30}>30 days</option>
+                    <option value={90}>90 days</option>
+                </select>
+                <Button
+                    type={ButtonType.Button}
+                    label={`Snooze ${snoozeDays}d`}
+                    size={ButtonSize.S}
+                    color={ButtonColor.Secondary}
+                    onClick={submitSnooze}
+                />
+            </div>
+            <input
+                type="text"
+                placeholder="Optional note (applied to this action)"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                style={{
+                    padding: '4px 8px',
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 4,
+                    fontSize: 12,
+                    minWidth: 240,
+                    background: COLORS.bg,
+                    color: COLORS.textPrimary,
+                }}
+            />
         </div>
     );
 };
+
