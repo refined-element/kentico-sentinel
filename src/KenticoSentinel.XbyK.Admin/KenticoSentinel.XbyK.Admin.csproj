@@ -110,9 +110,13 @@
 
     <!-- Now that dist/ exists, register its contents with @(AdminClientPath). Kentico's
          IncludeEmbededResource target runs next and transforms these items into
-         EmbeddedResource entries keyed by AdminResources/{orgName}.{projectName}/{filename},
-         which is how the admin shell resolves "/admin/adminresources/refinedelement.sentinel.admin/entry.js"
-         at runtime. ProjectName must match webpack config's projectName exactly. -->
+         EmbeddedResource entries keyed by AdminResources/{orgName}.{projectNameDotted}/{filename},
+         where projectNameDotted is the ProjectName with dashes replaced by dots (Kentico's
+         target calls .Replace('-','.') on the value — see the Kentico.Xperience.Admin.targets
+         file). So ProjectName="sentinel-admin" produces the runtime URL
+         "/admin/adminresources/refinedelement.sentinel.admin/entry.js". ProjectName must
+         match the webpack config's projectName exactly — the transformation only happens on
+         the MSBuild side, not on the admin shell's resolution side. -->
     <ItemGroup>
       <AdminClientPath Include="Client\dist\**">
         <ProjectName>sentinel-admin</ProjectName>
