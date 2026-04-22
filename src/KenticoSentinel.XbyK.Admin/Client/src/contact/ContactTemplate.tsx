@@ -34,17 +34,7 @@ interface SubmitResult {
     readonly errorMessage: string | null;
 }
 
-const COLORS = {
-    lime: '#D6F08D',
-    limeDark: '#B8D870',
-    bg: '#FFFFFF',
-    bgMuted: '#F7F7F9',
-    border: '#E5E7EB',
-    textPrimary: '#1A1A2E',
-    textMuted: '#6B7280',
-    error: '#DC2626',
-    success: '#10B981',
-} as const;
+import { THEME_COLORS as COLORS } from '../theme';
 
 const inputStyle: React.CSSProperties = {
     width: '100%',
@@ -61,7 +51,7 @@ const inputStyle: React.CSSProperties = {
 const labelStyle: React.CSSProperties = {
     display: 'block',
     marginBottom: 6,
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: 600,
     color: COLORS.textPrimary,
 };
@@ -225,7 +215,7 @@ export const ContactTemplate = (initial: ContactClientProperties) => {
                         onChange={(e) => setIncludeContext(e.target.checked)}
                         style={{ cursor: 'pointer' }}
                     />
-                    <label htmlFor="includeContext" style={{ fontSize: 13, color: COLORS.textPrimary, cursor: 'pointer', flex: 1 }}>
+                    <label htmlFor="includeContext" style={{ fontSize: 14, color: COLORS.textPrimary, cursor: 'pointer', flex: 1 }}>
                         <strong>Include finding context</strong>
                         <span style={{ display: 'block', color: COLORS.textMuted, fontSize: 12, marginTop: 2 }}>
                             Sends full finding messages + locations so the quote is more accurate. Off by default because
@@ -282,7 +272,7 @@ const ResultPanel = ({ result }: { result: SubmitResult }) => (
         }}
     >
         <strong>{result.success ? 'Quote request sent' : 'Submission failed'}</strong>
-        <div style={{ marginTop: 6, fontSize: 13 }}>
+        <div style={{ marginTop: 6, fontSize: 14 }}>
             {result.success
                 ? `Server returned HTTP ${result.statusCode}. We'll be in touch at the email you provided within one business day.`
                 : result.errorMessage ?? `Server returned HTTP ${result.statusCode}.`}

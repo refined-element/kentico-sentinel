@@ -18,17 +18,7 @@ interface SettingsClientProperties {
     readonly scheduledTasksUrl: string;
 }
 
-const COLORS = {
-    lime: '#D6F08D',
-    limeDark: '#B8D870',
-    bg: '#FFFFFF',
-    bgMuted: '#F7F7F9',
-    border: '#E5E7EB',
-    textPrimary: '#1A1A2E',
-    textMuted: '#6B7280',
-    error: '#DC2626',
-    success: '#10B981',
-} as const;
+import { THEME_COLORS as COLORS } from '../theme';
 
 export const SettingsTemplate = (props: SettingsClientProperties) => (
     <div style={{ padding: '24px 32px', maxWidth: 900, margin: '0 auto' }}>
@@ -89,7 +79,7 @@ export const SettingsTemplate = (props: SettingsClientProperties) => (
                 padding: 16,
                 background: COLORS.bgMuted,
                 borderRadius: 8,
-                fontSize: 13,
+                fontSize: 14,
                 color: COLORS.textMuted,
                 lineHeight: 1.6,
             }}
@@ -151,7 +141,7 @@ const MasterSwitch = ({ enabled }: { enabled: boolean }) => (
         </div>
         <div style={{ color: enabled ? '#14532D' : '#7F1D1D', fontSize: 14 }}>
             <div style={{ fontWeight: 600 }}>Sentinel is {enabled ? 'enabled' : 'disabled'}</div>
-            <div style={{ fontSize: 13 }}>
+            <div style={{ fontSize: 14 }}>
                 {enabled
                     ? 'Scans run on the scheduled cadence; admin can trigger manual scans from the Dashboard.'
                     : 'Scheduled scans are skipped. Flip Sentinel:Enabled to true to re-activate.'}
@@ -177,7 +167,7 @@ const Section = ({ title, rows }: { title: string; rows: ReadonlyArray<[string, 
                 background: COLORS.bgMuted,
             }}
         >
-            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                 {title}
             </h3>
         </header>

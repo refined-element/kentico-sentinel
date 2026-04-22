@@ -46,9 +46,9 @@ public static class RemediationGuide
             "Review with the content team: is this type intentional? If yes, ignore the finding (or suppress the rule). If no, delete the type via the admin Content types app. Acknowledge the finding if you've decided to keep it."),
 
         ["CNT002"] = new(
-            "Remove orphaned reusable content items",
-            "A reusable content item exists but no page or linked content references it. Orphans bloat the Content Hub and slow the admin's content-selection pickers.",
-            "Open the content item in the admin. If obsolete, delete it. If still useful, link it from at least one consuming page or mark it explicitly as a shared asset. Acknowledge the finding if you accept the orphan."),
+            "Remove stale unused content hub items",
+            "A reusable content item has no inbound references AND hasn't been edited in longer than your staleness threshold (default 180 days). Together these signal \"safe to delete\" — nothing uses it and nobody has touched it recently. Typical culprits: test images from a feature spike, documents for a campaign that ended, reusable content drafts that were superseded.",
+            "Open the item in Content Hub and confirm. If obsolete, delete. If still useful but orphaned, link it from a consuming page or flag as intentional shared asset (then acknowledge the finding). Bulk workflow: select all CNT002 findings in Scan Detail, sort by age, batch-delete the oldest tier first. Tune `Sentinel:RuntimeChecks:StaleDays` if 180d doesn't match your content cadence."),
 
         ["CNT003"] = new(
             "Review stale content",

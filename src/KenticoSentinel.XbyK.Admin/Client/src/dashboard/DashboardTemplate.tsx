@@ -61,19 +61,7 @@ interface RunNowResult {
 // Palette — Refined Element lime (#D6F08D) as the accent, muted neutrals for the rest so the
 // admin shell's chrome stays visually dominant. Error red / warning orange / info grey are
 // Kentico-adjacent so the dashboard reads at a glance without a legend.
-const COLORS = {
-    lime: '#D6F08D',
-    limeDark: '#B8D870',
-    bg: '#FFFFFF',
-    bgMuted: '#F7F7F9',
-    border: '#E5E7EB',
-    textPrimary: '#1A1A2E',
-    textMuted: '#6B7280',
-    error: '#DC2626',
-    warning: '#D97706',
-    info: '#6B7280',
-    success: '#10B981',
-} as const;
+import { THEME_COLORS as COLORS } from '../theme';
 
 export const DashboardTemplate = (initial: DashboardClientProperties) => {
     const [data, setData] = useState<DashboardClientProperties>(initial);
@@ -164,7 +152,7 @@ export const DashboardTemplate = (initial: DashboardClientProperties) => {
                 </Panel>
             </div>
 
-            <footer style={{ marginTop: 24, padding: 16, background: COLORS.bgMuted, borderRadius: 8, fontSize: 13, color: COLORS.textMuted }}>
+            <footer style={{ marginTop: 24, padding: 16, background: COLORS.bgMuted, borderRadius: 8, fontSize: 14, color: COLORS.textMuted }}>
                 Cadence is configured in <a href={data.scheduledTasksUrl} style={{ color: COLORS.limeDark, fontWeight: 600 }}>Scheduled tasks</a>.
                 Sentinel runs on whatever interval you set there — edit the row named <code>RefinedElement.SentinelScan</code> to change it or
                 click <em>Run scan now</em> above for an on-demand run.
@@ -218,7 +206,7 @@ const EmptyState = ({
             </a>
         </div>
         {runNowFeedback && (
-            <div style={{ marginTop: 20, fontSize: 13, color: runNowFeedback.tone === 'success' ? COLORS.success : COLORS.error }}>
+            <div style={{ marginTop: 20, fontSize: 14, color: runNowFeedback.tone === 'success' ? COLORS.success : COLORS.error }}>
                 {runNowFeedback.text}
             </div>
         )}
@@ -234,7 +222,7 @@ const FeedbackBanner = ({ tone, text, onDismiss }: { tone: 'success' | 'error'; 
             border: `1px solid ${tone === 'success' ? COLORS.success : COLORS.error}`,
             borderRadius: 8,
             color: tone === 'success' ? '#14532D' : '#7F1D1D',
-            fontSize: 13,
+            fontSize: 14,
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -307,12 +295,12 @@ const KpiTile = ({
                 borderLeft: `4px solid ${color}`,
             }}
         >
-            <div style={{ fontSize: 13, color: COLORS.textMuted, marginBottom: 6 }}>{label}</div>
+            <div style={{ fontSize: 14, color: COLORS.textMuted, marginBottom: 6 }}>{label}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
                 <div style={{ fontSize: 32, fontWeight: 700, color, lineHeight: 1 }}>{value.toLocaleString()}</div>
                 {showDelta && (
                     <div
-                        style={{ fontSize: 13, color: deltaColor, fontWeight: 600 }}
+                        style={{ fontSize: 14, color: deltaColor, fontWeight: 600 }}
                         title="Change since the previous scan"
                     >
                         {sign}{Math.abs(delta!).toLocaleString()}
@@ -359,7 +347,7 @@ const Panel = ({
                 {title}
             </h3>
             {linkText && linkHref && (
-                <a href={linkHref} style={{ fontSize: 13, color: COLORS.limeDark, textDecoration: 'none', fontWeight: 600 }}>
+                <a href={linkHref} style={{ fontSize: 14, color: COLORS.limeDark, textDecoration: 'none', fontWeight: 600 }}>
                     {linkText} →
                 </a>
             )}
@@ -562,7 +550,7 @@ const TopRulesList = ({ rules }: { rules: ReadonlyArray<RuleCount> }) => {
                             </div>
                         </button>
                         {isOpen && (
-                            <div style={{ padding: '0 20px 16px', fontSize: 13, color: COLORS.textMuted, lineHeight: 1.55 }}>
+                            <div style={{ padding: '0 20px 16px', fontSize: 14, color: COLORS.textMuted, lineHeight: 1.55 }}>
                                 {r.remediationTitle && (
                                     <>
                                         <div style={{ fontWeight: 600, color: COLORS.textPrimary, marginBottom: 4 }}>{r.remediationTitle}</div>
