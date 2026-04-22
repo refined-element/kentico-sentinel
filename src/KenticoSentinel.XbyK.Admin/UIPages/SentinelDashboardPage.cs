@@ -111,10 +111,12 @@ public class SentinelDashboardPage(
 
     private void PopulateDashboard(DashboardClientProperties properties)
     {
-        // Kentico admin deep-link paths vary by refresh and app-identifier convention; a
-        // hardcoded link to Scheduled Tasks would go stale across versions. Send admins to the
-        // admin root — the left-nav chrome resolves the "Scheduled tasks" entry correctly.
-        properties.ScheduledTasksUrl = "/admin";
+        // Kentico XbyK 31.x routes the Scheduled Tasks admin app at /admin/scheduled-tasks.
+        // Earlier we sent admins to /admin (root) worrying the app URL would drift across
+        // refreshes, but dogfooding showed "root" is worse UX — the left nav is cluttered,
+        // operators don't find Scheduled Tasks without hunting. Direct deep-link is fine;
+        // if Kentico renames the app slug in a future refresh, we'll update this one spot.
+        properties.ScheduledTasksUrl = "/admin/scheduled-tasks";
         properties.ScanHistoryUrl = "/admin/sentinel/scans";
         properties.FindingsUrl = "/admin/sentinel/findings";
 
