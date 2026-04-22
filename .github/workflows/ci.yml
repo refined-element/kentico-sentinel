@@ -22,6 +22,13 @@ on:
 permissions:
   contents: read
 
+# Opt into Node.js 24 for all pinned JavaScript actions. GitHub's deprecating Node 20 on Sep
+# 16 2026; before then the runner emits a warning on every run against actions still targeting
+# 20. This env var flips those actions to the new runtime without having to chase version
+# bumps across three third-party actions. Remove once Node 24 is the runner default.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-test:
     name: Build + test

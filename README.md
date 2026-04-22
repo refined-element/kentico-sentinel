@@ -106,6 +106,44 @@ Install (once v0.3.0-alpha is published to NuGet):
 
 No extra `Program.cs` wiring — the existing `AddKenticoSentinel()` call covers DI. The admin pages surface automatically.
 
+## Uninstall
+
+**Removing the NuGet package alone leaves the Sentinel tables and data intact.** This is intentional — operators who uninstall-then-reinstall (e.g. during a pipeline glitch or a version bump) don't want to lose their ack history, snooze notes, and scan baselines. Sentinel treats its data the way Kentico treats CMS data: the app is deletable, the data isn't.
+
+### What stays after `dotnet remove package`
+
+- `RefinedElement_SentinelScanRun` — historical scan runs
+- `RefinedElement_SentinelFinding` — findings from each run
+- `RefinedElement_SentinelFindingAck` — operator ack / snooze / note state
+- `CMS_Class` rows (three `DataClassInfo` registrations for the tables above)
+- `CMS_ScheduledTask` row (`TaskName = 'RefinedElement.SentinelScan'`) — will fail silently on its next tick because the handler class no longer loads. Not catastrophic, but noisy in the event log.
+
+Reinstalling the package picks up exactly where the previous version left off.
+
+### Clean teardown
+
+If you actually want Sentinel *gone* — gone-gone — remove the package from your csproj and then run:
+
+```sql
+-- Stop the scheduled task from firing against a missing handler.
+DELETE FROM CMS_ScheduledTask WHERE TaskName = 'RefinedElement.SentinelScan';
+
+-- Drop the data tables. IF EXISTS means the script is idempotent — safe to re-run if an
+-- earlier step failed partway through.
+DROP TABLE IF EXISTS RefinedElement_SentinelFindingAck;
+DROP TABLE IF EXISTS RefinedElement_SentinelFinding;
+DROP TABLE IF EXISTS RefinedElement_SentinelScanRun;
+
+-- Drop Kentico's metadata about the tables.
+DELETE FROM CMS_Class WHERE ClassName IN (
+    'refinedelement.sentinelfindingack',
+    'refinedelement.sentinelfinding',
+    'refinedelement.sentinelscanrun'
+);
+```
+
+Run against the Kentico database the XbyK project points at. Safe to run even if the tables are already gone (`DROP TABLE` / `DELETE` with a no-match condition are both no-ops).
+
 ## CLI (alternative / CI)
 
 Same checks, one-shot mode, no install in your XbyK project.
