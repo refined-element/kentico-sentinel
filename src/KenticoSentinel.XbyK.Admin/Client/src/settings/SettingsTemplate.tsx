@@ -18,7 +18,7 @@ interface SettingsClientProperties {
     readonly contactEndpoint: string;
     readonly contactIncludeContextByDefault: boolean;
     readonly scheduledTasksUrl: string;
-    readonly scheduleState: 'enabled' | 'disabled' | 'missing' | string;
+    readonly scheduleState: 'enabled' | 'disabled' | 'missing';
     readonly scheduleIntervalRaw: string;
     readonly scheduleIntervalHint: string;
     readonly scheduleLastRunUtc: string | null;

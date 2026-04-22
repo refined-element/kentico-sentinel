@@ -5,7 +5,7 @@
 // Contrast calibration (2026-04-22): the "lime" accent was #D6F08D which renders with poor
 // contrast against Kentico admin's light chrome — operators reported text in lime blocks
 // was hard to read. Darkened the background lime to #B8D870 (formerly limeDark) and promoted
-// an even darker #7A9F2F for text/interactive elements that need to pass AA against white.
+// an even darker #5A7D1F for text/interactive elements that need to pass AA against white.
 // Neutral text bumped one step darker so the default body copy reads against bgMuted panels.
 
 export const THEME_COLORS = {

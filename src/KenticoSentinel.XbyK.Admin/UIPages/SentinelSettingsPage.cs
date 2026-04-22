@@ -103,8 +103,9 @@ public class SentinelSettingsPage(
     /// Best-effort humanization of Kentico's pipe-delimited interval format. We only parse the
     /// first two fields (period + every) because those carry 90% of the useful information, and
     /// Kentico's internal parser is the ground truth for the rest. Admin sees something like
-    /// "every 1 day" instead of the raw "day;1;00:00:00" — good enough to confirm the cadence
-    /// without making them decode the format.
+    /// "every day" (for every=1) or "every 3 days" (for every=3) instead of the raw
+    /// "day;1;00:00:00" — good enough to confirm the cadence without making them decode the
+    /// format. One-time schedules get the literal "runs once" since "every one-time" is nonsense.
     /// </summary>
     private static string HumanizeInterval(string? raw)
     {
@@ -123,6 +124,12 @@ public class SentinelSettingsPage(
         {
             return $"raw: {raw}";
         }
+        // One-time schedules don't take a period multiplier ("every 2 one-times" is nonsense),
+        // so short-circuit to the literal phrase Kentico admins would recognize.
+        if (period == "once")
+        {
+            return "runs once";
+        }
         var unit = period switch
         {
             "second" => "second",
@@ -132,7 +139,6 @@ public class SentinelSettingsPage(
             "week" => "week",
             "month" => "month",
             "year" => "year",
-            "once" => "one-time",
             _ => period,
         };
         return every == 1 ? $"every {unit}" : $"every {every} {unit}s";
@@ -166,7 +172,7 @@ public sealed class SettingsClientProperties : TemplateClientProperties
     public string ScheduleState { get; set; } = "missing";
     /// <summary>Raw pipe-delimited interval ("day;1;00:00:00") — shown in small print for transparency.</summary>
     public string ScheduleIntervalRaw { get; set; } = string.Empty;
-    /// <summary>Human-readable cadence ("every 1 day") — primary display.</summary>
+    /// <summary>Human-readable cadence ("every day", "every 3 days", "runs once") — primary display.</summary>
     public string ScheduleIntervalHint { get; set; } = string.Empty;
     /// <summary>ISO-8601 UTC timestamp of the last successful run, or null if never run.</summary>
     public string? ScheduleLastRunUtc { get; set; }
