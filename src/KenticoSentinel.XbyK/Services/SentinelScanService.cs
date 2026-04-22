@@ -1,3 +1,4 @@
+using CMS.Core;
 using CMS.DataEngine;
 using CMS.Helpers;
 
@@ -10,6 +11,7 @@ using RefinedElement.Kentico.Sentinel.XbyK.Configuration;
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelFinding;
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelScanRun;
 using RefinedElement.Kentico.Sentinel.XbyK.Notifications;
+using RefinedElement.Kentico.Sentinel.XbyK.Retention;
 
 namespace RefinedElement.Kentico.Sentinel.XbyK.Services;
 
@@ -24,6 +26,8 @@ public sealed class SentinelScanService(
     IHttpClientFactory httpClientFactory,
     ISentinelEventLogWriter eventLogWriter,
     ISentinelEmailDigestSender digestSender,
+    ISentinelRetentionService retentionService,
+    IEventLogService kenticoEventLog,
     IHostEnvironment hostEnvironment,
     ILogger<SentinelScanService> logger)
 {
@@ -156,6 +160,44 @@ public sealed class SentinelScanService(
                     logger.LogWarning(ex,
                         "Sentinel scan {RunId} completed, but email digest delivery failed.",
                         runRow.SentinelScanRunID);
+                }
+            }
+
+            // Retention trim after the post-scan notifiers — trimming is strictly housekeeping and
+            // must not influence scan status (same reasoning as the EventLog/digest blocks above).
+            // Runs on every scan because a trim pass is cheap when the table's already within
+            // threshold (one indexed TopN query, zero writes). A failure here is logged to the CMS
+            // event log as "RETENTION_TRIM_FAILED" so admins can see it in the same app they'd
+            // already be browsing for scan history, and we swallow the exception so the caller
+            // still sees a successful scan return.
+            try
+            {
+                await retentionService.TrimAsync(cancellationToken).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // Host shutdown / cancelled task — not our problem to report. Let the scan
+                // return normally with its findings already persisted.
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex,
+                    "Sentinel scan {RunId} completed, but retention trim failed.",
+                    runRow.SentinelScanRunID);
+                try
+                {
+                    kenticoEventLog.LogException(
+                        source: "Sentinel",
+                        eventCode: "RETENTION_TRIM_FAILED",
+                        ex: ex,
+                        additionalMessage:
+                            $"Sentinel scan #{runRow.SentinelScanRunID} completed but retention trim failed; " +
+                            "old scan runs and findings may still be present. See application logs.");
+                }
+                catch
+                {
+                    // Belt-and-suspenders: if the event log itself is the thing failing, don't
+                    // blow up the scan return over a secondary logging error.
                 }
             }
 
