@@ -875,7 +875,7 @@ const AckActions = ({
 
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
-            <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                 <Button
                     type={ButtonType.Button}
                     label="Acknowledge"
@@ -883,31 +883,53 @@ const AckActions = ({
                     color={ButtonColor.Secondary}
                     onClick={() => onMutate({ fingerprint, action: 'acknowledge', note: note.trim() || undefined })}
                 />
-                <select
-                    value={snoozeDays}
-                    onChange={(e) => setSnoozeDays(Number(e.target.value))}
-                    aria-label="Snooze duration"
+                {/*
+                  Snooze group: dropdown + button wrapped in a shared container so the
+                  duration selector visually "belongs" to the Snooze action, not Acknowledge.
+                  Zero gap between dropdown and button + matching heights + subtle bgMuted
+                  background — reads as a paired control. Gap:16 outside the group separates
+                  it from Acknowledge so there's no ambiguity about which button owns the
+                  dropdown.
+                */}
+                <div
                     style={{
-                        padding: '4px 8px',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        background: COLORS.bgMuted,
                         border: `1px solid ${COLORS.border}`,
                         borderRadius: 4,
-                        fontSize: 13,
-                        background: COLORS.bg,
-                        color: COLORS.textPrimary,
+                        padding: '3px 4px 3px 8px',
+                        gap: 8,
                     }}
+                    aria-label="Snooze action group"
                 >
-                    <option value={1}>1 day</option>
-                    <option value={7}>7 days</option>
-                    <option value={30}>30 days</option>
-                    <option value={90}>90 days</option>
-                </select>
-                <Button
-                    type={ButtonType.Button}
-                    label={`Snooze ${snoozeDays}d`}
-                    size={ButtonSize.S}
-                    color={ButtonColor.Secondary}
-                    onClick={submitSnooze}
-                />
+                    <select
+                        value={snoozeDays}
+                        onChange={(e) => setSnoozeDays(Number(e.target.value))}
+                        aria-label="Snooze duration"
+                        style={{
+                            padding: '3px 6px',
+                            border: `1px solid ${COLORS.border}`,
+                            background: COLORS.bg,
+                            color: COLORS.textPrimary,
+                            fontSize: 13,
+                            borderRadius: 3,
+                            outline: 'none',
+                        }}
+                    >
+                        <option value={1}>1 day</option>
+                        <option value={7}>7 days</option>
+                        <option value={30}>30 days</option>
+                        <option value={90}>90 days</option>
+                    </select>
+                    <Button
+                        type={ButtonType.Button}
+                        label={`Snooze ${snoozeDays}d`}
+                        size={ButtonSize.S}
+                        color={ButtonColor.Secondary}
+                        onClick={submitSnooze}
+                    />
+                </div>
             </div>
             <input
                 type="text"
