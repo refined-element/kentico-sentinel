@@ -7,6 +7,7 @@ using CMS.Scheduler;
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelFinding;
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelFindingAck;
 using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelScanRun;
+using RefinedElement.Kentico.Sentinel.XbyK.InfoModels.SentinelSettingsOverride;
 using RefinedElement.Kentico.Sentinel.XbyK.Scheduling;
 
 namespace RefinedElement.Kentico.Sentinel.XbyK;
@@ -33,6 +34,7 @@ public class SentinelModuleInstaller(
         InstallScanRun(resource);
         InstallFinding(resource);
         InstallFindingAck(resource);
+        InstallSettingsOverride(resource);
         TryInstallDefaultScheduledTask();
     }
 
@@ -166,6 +168,36 @@ public class SentinelModuleInstaller(
         form.AddFormItem(Field(nameof(SentinelFindingAckInfo.SentinelFindingAckUserID), "integer"));
         form.AddFormItem(Field(nameof(SentinelFindingAckInfo.SentinelFindingAckAckedAt), "datetime"));
         form.AddFormItem(TextField(nameof(SentinelFindingAckInfo.SentinelFindingAckNote), "longtext", allowEmpty: true));
+
+        SetFormDefinition(info, form);
+        if (info.HasChanged) DataClassInfoProvider.SetDataClassInfo(info);
+    }
+
+    private static void InstallSettingsOverride(ResourceInfo resource)
+    {
+        var info = DataClassInfoProvider.GetDataClassInfo(SentinelSettingsOverrideInfo.OBJECT_TYPE)
+            ?? DataClassInfo.New(SentinelSettingsOverrideInfo.OBJECT_TYPE);
+        info.ClassName = SentinelSettingsOverrideInfo.TYPEINFO.ObjectClassName;
+        info.ClassTableName = SentinelSettingsOverrideInfo.TYPEINFO.ObjectClassName.Replace(".", "_");
+        info.ClassDisplayName = "Sentinel settings override";
+        info.ClassType = ClassType.OTHER;
+        info.ClassResourceID = resource.ResourceID;
+
+        var form = FormHelper.GetBasicFormDefinition(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideID));
+        form.AddFormItem(TextField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideGuid), "guid", allowEmpty: false));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEnabled), "boolean"));
+        form.AddFormItem(TextField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideExcludedChecks), "longtext", allowEmpty: true));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideStaleDays), "integer"));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEventLogDays), "integer"));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEventLogEnabled), "boolean"));
+        form.AddFormItem(TextField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEventLogSeverityThreshold), "text", size: 16));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEventLogMaxEntriesPerScan), "integer"));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEmailDigestEnabled), "boolean"));
+        form.AddFormItem(TextField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEmailDigestRecipients), "longtext", allowEmpty: true));
+        form.AddFormItem(TextField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEmailDigestSeverityThreshold), "text", size: 16));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEmailDigestOnlyWhenThresholdFindings), "boolean"));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideLastModifiedBy), "integer"));
+        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideLastModifiedAt), "datetime"));
 
         SetFormDefinition(info, form);
         if (info.HasChanged) DataClassInfoProvider.SetDataClassInfo(info);

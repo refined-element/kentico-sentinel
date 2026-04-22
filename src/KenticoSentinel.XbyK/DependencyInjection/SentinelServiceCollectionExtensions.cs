@@ -8,6 +8,7 @@ using RefinedElement.Kentico.Sentinel.XbyK.Contact;
 using RefinedElement.Kentico.Sentinel.XbyK.Notifications;
 using RefinedElement.Kentico.Sentinel.XbyK.Retention;
 using RefinedElement.Kentico.Sentinel.XbyK.Services;
+using RefinedElement.Kentico.Sentinel.XbyK.SettingsOverride;
 
 namespace RefinedElement.Kentico.Sentinel.XbyK.DependencyInjection;
 
@@ -68,6 +69,12 @@ public static class SentinelServiceCollectionExtensions
         // coupling the scan-completion pipeline's scope lifetime to the trim pass. The scan
         // service is Scoped and resolves this inline when it fires a trim after each run.
         services.AddTransient<ISentinelRetentionService, SentinelRetentionService>();
+
+        // Settings-override store — reads the single-row admin-UI override and layers it on top
+        // of SentinelOptions via PostConfigure. Scoped because it holds an IInfoProvider<T>
+        // dependency that Kentico resolves per-request; the applier is Scoped for the same reason.
+        services.AddScoped<ISentinelSettingsOverrideStore, SentinelSettingsOverrideStore>();
+        services.AddScoped<IPostConfigureOptions<SentinelOptions>, SentinelOptionsOverrideApplier>();
 
         // Typed HttpClient for the Refined Element quote intake. 30s timeout leaves headroom for
         // KDaaS cold-start while still bounding a hung dependency — the admin UI surface is
