@@ -250,6 +250,13 @@ public class SentinelModuleInstaller(
             return;
         }
 
+        // The CMS_ScheduledTaskConfiguration table has 8 NOT NULL columns we don't get for free:
+        // Name, DisplayName, Interval, Data, GUID, LastModified, ScheduledTaskIdentifier, and
+        // several bit flags. C# value-type defaults cover the bits and timestamps; we explicitly
+        // populate every string + GUID field so the INSERT doesn't trip a NULL constraint. Each
+        // missing column would have shipped as a separate hotfix (v0.3.2 only covered Interval,
+        // v0.3.3 picks up Data / GUID / LastModified) — cheaper to set them all now even though
+        // some would auto-default.
         var task = new ScheduledTaskConfigurationInfo
         {
             ScheduledTaskConfigurationName = SentinelScanTask.TaskName,
@@ -258,6 +265,16 @@ public class SentinelModuleInstaller(
             ScheduledTaskConfigurationEnabled = false,
             ScheduledTaskConfigurationDeleteAfterLastRun = false,
             ScheduledTaskConfigurationInterval = DefaultDailyInterval,
+            // Empty string (not null) satisfies the NOT NULL constraint on the nvarchar(max)
+            // Data column. Kentico uses this for task-specific XML payload when the task class
+            // wants custom serialized state at schedule time — the Sentinel scan needs none, so
+            // empty is semantically correct.
+            ScheduledTaskConfigurationData = string.Empty,
+            // Kentico's AbstractInfo base class SHOULD populate GUID + LastModified on Set(),
+            // but we set them explicitly as defence in depth — a silent default-to-null here
+            // would bubble back up as another "column X cannot be NULL" INSERT error next boot.
+            ScheduledTaskConfigurationGUID = Guid.NewGuid(),
+            ScheduledTaskConfigurationLastModified = DateTime.UtcNow,
         };
         scheduledTaskProvider.Set(task);
     }
