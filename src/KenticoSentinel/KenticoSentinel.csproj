@@ -13,7 +13,7 @@
     <PackAsTool>true</PackAsTool>
     <ToolCommandName>sentinel</ToolCommandName>
     <PackageId>RefinedElement.Kentico.Sentinel</PackageId>
-    <Version>0.3.1-alpha</Version>
+    <Version>0.3.2-alpha</Version>
     <Authors>Refined Element</Authors>
     <Company>Refined Element</Company>
     <Description>Health scanner for Xperience by Kentico projects (XbyK 29+). Free, open-source CLI that reports config smells, middleware-order bugs, outdated NuGet packages, unused content types, orphaned content items, stale content, broken assets, malformed Page Builder widgets, and recent EventLog errors. The check library is also published as RefinedElement.Kentico.Sentinel.Core for embedding in XbyK sites. Does NOT support Kentico Xperience 13 — XbyK only.</Description>
