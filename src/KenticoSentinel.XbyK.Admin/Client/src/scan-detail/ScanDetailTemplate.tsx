@@ -89,19 +89,7 @@ interface ExportFindingsResponse {
     readonly fileName: string;
 }
 
-const COLORS = {
-    lime: '#D6F08D',
-    limeDark: '#B8D870',
-    bg: '#FFFFFF',
-    bgMuted: '#F7F7F9',
-    border: '#E5E7EB',
-    textPrimary: '#1A1A2E',
-    textMuted: '#6B7280',
-    error: '#DC2626',
-    warning: '#D97706',
-    info: '#6B7280',
-    success: '#10B981',
-} as const;
+import { THEME_COLORS as COLORS } from '../theme';
 
 const severityColor = (severity: string) =>
     severity === 'Error' ? COLORS.error : severity === 'Warning' ? COLORS.warning : COLORS.info;
@@ -293,11 +281,11 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
                             placeholder="Search rule / category / message…"
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            style={{ padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13, minWidth: 240 }}
+                            style={{ padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 14, minWidth: 240 }}
                         />
                     </div>
                     <div>
-                        <label htmlFor="sentinel-scan-picker" style={{ fontSize: 13, color: COLORS.textMuted, marginRight: 8 }}>
+                        <label htmlFor="sentinel-scan-picker" style={{ fontSize: 14, color: COLORS.textMuted, marginRight: 8 }}>
                             Scan:
                         </label>
                         <select
@@ -305,7 +293,7 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
                             value={selectedRunId ?? ''}
                             onChange={(e) => onScanChange(Number(e.target.value))}
                             disabled={isLoading}
-                            style={{ padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}
+                            style={{ padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 14 }}
                         >
                             {initial.availableScans.map((s) => (
                                 <option key={s.runId} value={s.runId}>
@@ -344,7 +332,7 @@ export const ScanDetailTemplate = (initial: ScanDetailClientProperties) => {
                         border: `1px solid ${COLORS.success}`,
                         borderRadius: 6,
                         color: '#14532D',
-                        fontSize: 13,
+                        fontSize: 14,
                     }}
                 >
                     {feedback}
@@ -458,7 +446,7 @@ const BulkActionBar = ({
                 transition: 'background 120ms ease',
             }}
         >
-            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: COLORS.textPrimary, cursor: visibleFingerprints.length > 0 ? 'pointer' : 'default' }}>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 14, color: COLORS.textPrimary, cursor: visibleFingerprints.length > 0 ? 'pointer' : 'default' }}>
                 <input
                     type="checkbox"
                     disabled={visibleFingerprints.length === 0}
@@ -475,7 +463,7 @@ const BulkActionBar = ({
                         placeholder="Optional note (applied to all)"
                         value={noteDraft}
                         onChange={(e) => setNoteDraft(e.target.value)}
-                        style={{ flex: '1 1 240px', minWidth: 200, padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 13 }}
+                        style={{ flex: '1 1 240px', minWidth: 200, padding: '6px 10px', border: `1px solid ${COLORS.border}`, borderRadius: 6, fontSize: 14 }}
                     />
                     <Button
                         type={ButtonType.Button}
@@ -576,7 +564,7 @@ const FilterBar = ({
                 borderRadius: 20,
                 background: filter === id ? COLORS.lime : COLORS.bg,
                 color: COLORS.textPrimary,
-                fontSize: 13,
+                fontSize: 14,
                 fontWeight: filter === id ? 600 : 500,
                 cursor: 'pointer',
             }}
@@ -635,7 +623,7 @@ const CategorySection = ({
                     onChange={() => onToggleCategory(categoryFingerprints)}
                     aria-label={`Select all findings in ${category}`}
                 />
-                <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+                <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: COLORS.textPrimary, textTransform: 'uppercase', letterSpacing: 0.3 }}>
                     {category} <span style={{ color: COLORS.textMuted, fontWeight: 500, marginLeft: 8 }}>{findings.length}</span>
                 </h3>
             </header>
@@ -700,7 +688,7 @@ const FindingRow = ({
                         <AckBadge state={ackState} until={snoozeUntil} />
                         <AgeBadge scanCount={finding.scanOccurrences} firstSeenUtc={finding.firstSeenUtc} />
                     </div>
-                    <div style={{ color: COLORS.textMuted, fontSize: 13, marginTop: 4, lineHeight: 1.5 }}>
+                    <div style={{ color: COLORS.textMuted, fontSize: 14, marginTop: 4, lineHeight: 1.5 }}>
                         {finding.message}
                     </div>
                     {finding.location && (
@@ -718,7 +706,7 @@ const FindingRow = ({
                                 border: `1px solid ${COLORS.border}`,
                                 borderRadius: 4,
                                 background: 'transparent',
-                                color: COLORS.limeDark,
+                                color: COLORS.limeText,
                                 fontSize: 12,
                                 fontWeight: 600,
                                 cursor: 'pointer',
@@ -737,7 +725,7 @@ const FindingRow = ({
                         padding: 14,
                         background: COLORS.bgMuted,
                         borderRadius: 6,
-                        fontSize: 13,
+                        fontSize: 14,
                         color: COLORS.textPrimary,
                         lineHeight: 1.6,
                     }}

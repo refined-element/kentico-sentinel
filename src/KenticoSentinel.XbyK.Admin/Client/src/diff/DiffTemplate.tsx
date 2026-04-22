@@ -31,21 +31,7 @@ interface DiffClientProperties {
     readonly defaultAfterRunId: number;
 }
 
-const COLORS = {
-    lime: '#D6F08D',
-    limeDark: '#B8D870',
-    bg: '#FFFFFF',
-    bgMuted: '#F7F7F9',
-    border: '#E5E7EB',
-    textPrimary: '#1A1A2E',
-    textMuted: '#6B7280',
-    error: '#DC2626',
-    warning: '#D97706',
-    info: '#6B7280',
-    success: '#10B981',
-    introduced: '#B45309',
-    resolved: '#15803D',
-} as const;
+import { THEME_COLORS as COLORS } from '../theme';
 
 export const DiffTemplate = (initial: DiffClientProperties) => {
     const [beforeId, setBeforeId] = useState<number>(initial.defaultBeforeRunId);
@@ -109,7 +95,7 @@ export const DiffTemplate = (initial: DiffClientProperties) => {
                 }}
             >
                 <div>
-                    <label htmlFor="sentinel-diff-before" style={{ display: 'block', fontSize: 13, color: COLORS.textMuted, marginBottom: 6 }}>
+                    <label htmlFor="sentinel-diff-before" style={{ display: 'block', fontSize: 14, color: COLORS.textMuted, marginBottom: 6 }}>
                         Before
                     </label>
                     <select
@@ -127,7 +113,7 @@ export const DiffTemplate = (initial: DiffClientProperties) => {
                 </div>
                 <div style={{ color: COLORS.textMuted, fontSize: 20, paddingBottom: 6 }}>→</div>
                 <div>
-                    <label htmlFor="sentinel-diff-after" style={{ display: 'block', fontSize: 13, color: COLORS.textMuted, marginBottom: 6 }}>
+                    <label htmlFor="sentinel-diff-after" style={{ display: 'block', fontSize: 14, color: COLORS.textMuted, marginBottom: 6 }}>
                         After
                     </label>
                     <select
@@ -163,7 +149,7 @@ export const DiffTemplate = (initial: DiffClientProperties) => {
                         border: `1px solid ${COLORS.error}`,
                         borderRadius: 8,
                         color: '#7F1D1D',
-                        fontSize: 13,
+                        fontSize: 14,
                     }}
                 >
                     {diff.message}
@@ -201,7 +187,7 @@ const SummaryRow = ({ diff }: { diff: DiffResponse }) => {
             }}
         >
             <div style={{ fontSize: 24, fontWeight: 700, color: tone }}>{label}</div>
-            <div style={{ display: 'flex', gap: 16, fontSize: 13, color: COLORS.textMuted }}>
+            <div style={{ display: 'flex', gap: 16, fontSize: 14, color: COLORS.textMuted }}>
                 <span>
                     <strong style={{ color: COLORS.introduced }}>{diff.introduced.length}</strong> introduced
                 </span>
@@ -248,17 +234,17 @@ const DiffColumn = ({
                 alignItems: 'center',
             }}
         >
-            <h3 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: tone, textTransform: 'uppercase', letterSpacing: 0.3 }}>
+            <h3 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: tone, textTransform: 'uppercase', letterSpacing: 0.3 }}>
                 <span style={{ marginRight: 6 }}>{icon}</span>{title}
             </h3>
             <span style={{ fontSize: 12, color: COLORS.textMuted }}>{findings.length}</span>
         </header>
         {findings.length === 0 ? (
-            <div style={{ padding: 18, fontSize: 13, color: COLORS.textMuted, textAlign: 'center' }}>{emptyText}</div>
+            <div style={{ padding: 18, fontSize: 14, color: COLORS.textMuted, textAlign: 'center' }}>{emptyText}</div>
         ) : (
             <ul style={{ listStyle: 'none', margin: 0, padding: 0, maxHeight: 500, overflowY: 'auto' }}>
                 {findings.map((f) => (
-                    <li key={f.fingerprint} style={{ padding: '10px 14px', borderBottom: `1px solid ${COLORS.border}`, fontSize: 13 }}>
+                    <li key={f.fingerprint} style={{ padding: '10px 14px', borderBottom: `1px solid ${COLORS.border}`, fontSize: 14 }}>
                         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
                             <SeverityChip severity={f.severity} />
                             <code style={{ color: COLORS.textPrimary, fontWeight: 700, fontSize: 12 }}>{f.ruleId}</code>
