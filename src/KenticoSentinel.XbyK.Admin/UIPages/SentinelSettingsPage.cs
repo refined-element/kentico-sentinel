@@ -1,4 +1,6 @@
+using CMS.DataEngine;
 using CMS.Membership;
+using CMS.Scheduler;
 
 using Kentico.Xperience.Admin.Base;
 using Kentico.Xperience.Admin.Base.UIPages;
@@ -9,6 +11,7 @@ using RefinedElement.Kentico.Sentinel.Quoting;
 using RefinedElement.Kentico.Sentinel.XbyK.Admin;
 using RefinedElement.Kentico.Sentinel.XbyK.Admin.UIPages;
 using RefinedElement.Kentico.Sentinel.XbyK.Configuration;
+using RefinedElement.Kentico.Sentinel.XbyK.Scheduling;
 
 [assembly: UIPage(
     parentType: typeof(SentinelApplicationPage),
@@ -29,7 +32,10 @@ namespace RefinedElement.Kentico.Sentinel.XbyK.Admin.UIPages;
 /// Admins edit the source and redeploy; this page just surfaces what's currently loaded.
 /// </summary>
 [UIEvaluatePermission(SystemPermissions.VIEW)]
-public class SentinelSettingsPage(IOptions<SentinelOptions> options) : Page<SettingsClientProperties>
+public class SentinelSettingsPage(
+    IOptions<SentinelOptions> options,
+    IInfoProvider<ScheduledTaskConfigurationInfo> scheduledTaskProvider)
+    : Page<SettingsClientProperties>
 {
     public override Task<SettingsClientProperties> ConfigureTemplateProperties(SettingsClientProperties properties)
     {
@@ -61,7 +67,75 @@ public class SentinelSettingsPage(IOptions<SentinelOptions> options) : Page<Sett
         // the instructional copy accurate across versions.
         properties.ScheduledTasksUrl = "/admin";
 
+        // Cadence + enabled state read directly from CMS_ScheduledTaskConfiguration. We surface
+        // the raw pipe-delimited Interval plus a human hint so the admin doesn't have to leave
+        // the Sentinel app to answer "is this actually running, and how often?". True editing
+        // still happens in the Scheduled Tasks admin app — this block is the status readout.
+        var task = scheduledTaskProvider.Get()
+            .WhereEquals(nameof(ScheduledTaskConfigurationInfo.ScheduledTaskConfigurationScheduledTaskIdentifier), SentinelScanTask.TaskName)
+            .TopN(1)
+            .FirstOrDefault();
+        if (task is null)
+        {
+            properties.ScheduleState = "missing";
+            properties.ScheduleIntervalRaw = string.Empty;
+            properties.ScheduleIntervalHint = "No scheduled task row found — automated scans are not running. Create one in Scheduled tasks.";
+            properties.ScheduleLastRunUtc = null;
+            properties.ScheduleNextRunUtc = null;
+        }
+        else
+        {
+            properties.ScheduleState = task.ScheduledTaskConfigurationEnabled ? "enabled" : "disabled";
+            properties.ScheduleIntervalRaw = task.ScheduledTaskConfigurationInterval ?? string.Empty;
+            properties.ScheduleIntervalHint = HumanizeInterval(task.ScheduledTaskConfigurationInterval);
+            properties.ScheduleLastRunUtc = task.ScheduledTaskConfigurationLastRunTime == default
+                ? null
+                : DateTime.SpecifyKind(task.ScheduledTaskConfigurationLastRunTime, DateTimeKind.Utc).ToString("O");
+            properties.ScheduleNextRunUtc = task.ScheduledTaskConfigurationNextRunTime == default
+                ? null
+                : DateTime.SpecifyKind(task.ScheduledTaskConfigurationNextRunTime, DateTimeKind.Utc).ToString("O");
+        }
+
         return Task.FromResult(properties);
+    }
+
+    /// <summary>
+    /// Best-effort humanization of Kentico's pipe-delimited interval format. We only parse the
+    /// first two fields (period + every) because those carry 90% of the useful information, and
+    /// Kentico's internal parser is the ground truth for the rest. Admin sees something like
+    /// "every 1 day" instead of the raw "day;1;00:00:00" — good enough to confirm the cadence
+    /// without making them decode the format.
+    /// </summary>
+    private static string HumanizeInterval(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw))
+        {
+            return "(no interval configured)";
+        }
+        var parts = raw.Split(';');
+        if (parts.Length < 2 || string.IsNullOrWhiteSpace(parts[0]))
+        {
+            return $"raw: {raw}";
+        }
+        var period = parts[0].ToLowerInvariant();
+        var every = int.TryParse(parts[1], out var n) ? n : 0;
+        if (every <= 0)
+        {
+            return $"raw: {raw}";
+        }
+        var unit = period switch
+        {
+            "second" => "second",
+            "minute" => "minute",
+            "hour" => "hour",
+            "day" => "day",
+            "week" => "week",
+            "month" => "month",
+            "year" => "year",
+            "once" => "one-time",
+            _ => period,
+        };
+        return every == 1 ? $"every {unit}" : $"every {every} {unit}s";
     }
 }
 
@@ -87,4 +161,15 @@ public sealed class SettingsClientProperties : TemplateClientProperties
     public bool ContactIncludeContextByDefault { get; set; }
 
     public string ScheduledTasksUrl { get; set; } = string.Empty;
+
+    /// <summary>"enabled" | "disabled" | "missing" — readable state of the scheduled task row.</summary>
+    public string ScheduleState { get; set; } = "missing";
+    /// <summary>Raw pipe-delimited interval ("day;1;00:00:00") — shown in small print for transparency.</summary>
+    public string ScheduleIntervalRaw { get; set; } = string.Empty;
+    /// <summary>Human-readable cadence ("every 1 day") — primary display.</summary>
+    public string ScheduleIntervalHint { get; set; } = string.Empty;
+    /// <summary>ISO-8601 UTC timestamp of the last successful run, or null if never run.</summary>
+    public string? ScheduleLastRunUtc { get; set; }
+    /// <summary>ISO-8601 UTC timestamp of the next scheduled run, or null if disabled/never scheduled.</summary>
+    public string? ScheduleNextRunUtc { get; set; }
 }
