@@ -10,7 +10,7 @@
     <AssemblyName>RefinedElement.Kentico.Sentinel.XbyK.Admin</AssemblyName>
 
     <PackageId>RefinedElement.Kentico.Sentinel.XbyK.Admin</PackageId>
-    <Version>0.3.4-alpha</Version>
+    <Version>0.4.0-alpha</Version>
     <Authors>Refined Element</Authors>
     <Company>Refined Element</Company>
     <Description>Admin UI for Kentico Sentinel. Adds a "Sentinel" application under Configuration in the Kentico admin — Dashboard with KPI tiles + recent scans + top rule offenders, Findings listing, Scan history listing, and an in-admin "Request a quote" contact form that submits sanitized scans to Refined Element. Ships alongside RefinedElement.Kentico.Sentinel.XbyK; headless installs that don't want the admin surface can omit this package.</Description>
@@ -19,6 +19,7 @@
     <PackageProjectUrl>https://github.com/refined-element/kentico-sentinel</PackageProjectUrl>
     <RepositoryUrl>https://github.com/refined-element/kentico-sentinel</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
 
     <!--
       AdminOrgName identifies the org that publishes this admin client bundle. Combined with the
@@ -29,6 +30,10 @@
     -->
     <AdminOrgName>refinedelement</AdminOrgName>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <!-- References the XbyK integration package (via ProjectReference while both live in this

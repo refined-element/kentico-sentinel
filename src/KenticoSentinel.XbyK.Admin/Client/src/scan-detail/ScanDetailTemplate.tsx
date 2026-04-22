@@ -842,7 +842,13 @@ const AckActions = ({
     ackState: string;
     onMutate: (data: { fingerprint: string; action: string; snoozeUntilUtc?: string; note?: string }) => void;
 }) => {
-    const [snoozeOpen, setSnoozeOpen] = useState(false);
+    // Single-click snooze: clicking "Snooze" submits immediately with a 7-day default. The
+    // "Customize" toggle reveals the day-count dropdown + note field for operators who need a
+    // different duration. Previous flow made "Snooze" a panel-open button, and a lot of people
+    // (verified on re-xbk dogfood) thought that first click submitted — closed the row, moved on,
+    // never realized no row got written. The two-click path is preserved for intentional tweaks;
+    // the default is one click.
+    const [customizeOpen, setCustomizeOpen] = useState(false);
     const [snoozeDays, setSnoozeDays] = useState(7);
     const [note, setNote] = useState('');
 
@@ -858,6 +864,19 @@ const AckActions = ({
         );
     }
 
+    const submitSnooze = (days: number, noteText: string) => {
+        const until = new Date();
+        until.setUTCDate(until.getUTCDate() + days);
+        onMutate({
+            fingerprint,
+            action: 'snooze',
+            snoozeUntilUtc: until.toISOString(),
+            note: noteText.trim() || undefined,
+        });
+        setCustomizeOpen(false);
+        setNote('');
+    };
+
     return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'flex-end' }}>
             <div style={{ display: 'flex', gap: 6 }}>
@@ -870,13 +889,20 @@ const AckActions = ({
                 />
                 <Button
                     type={ButtonType.Button}
-                    label={snoozeOpen ? 'Cancel' : 'Snooze'}
+                    label="Snooze 7d"
                     size={ButtonSize.S}
                     color={ButtonColor.Secondary}
-                    onClick={() => setSnoozeOpen(!snoozeOpen)}
+                    onClick={() => submitSnooze(7, note)}
+                />
+                <Button
+                    type={ButtonType.Button}
+                    label={customizeOpen ? 'Cancel' : 'Customize…'}
+                    size={ButtonSize.S}
+                    color={ButtonColor.Secondary}
+                    onClick={() => setCustomizeOpen(!customizeOpen)}
                 />
             </div>
-            {snoozeOpen && (
+            {customizeOpen && (
                 <div
                     style={{
                         padding: 10,
@@ -911,21 +937,10 @@ const AckActions = ({
                     />
                     <Button
                         type={ButtonType.Button}
-                        label={`Snooze ${snoozeDays}d`}
+                        label={`Snooze ${snoozeDays}d with note`}
                         size={ButtonSize.S}
                         color={ButtonColor.Primary}
-                        onClick={() => {
-                            const until = new Date();
-                            until.setUTCDate(until.getUTCDate() + snoozeDays);
-                            onMutate({
-                                fingerprint,
-                                action: 'snooze',
-                                snoozeUntilUtc: until.toISOString(),
-                                note: note.trim() || undefined,
-                            });
-                            setSnoozeOpen(false);
-                            setNote('');
-                        }}
+                        onClick={() => submitSnooze(snoozeDays, note)}
                     />
                 </div>
             )}

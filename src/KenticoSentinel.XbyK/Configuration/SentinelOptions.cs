@@ -21,6 +21,7 @@ public sealed class SentinelOptions
     public EmailDigestOptions EmailDigest { get; set; } = new();
     public EventLogOptions EventLogIntegration { get; set; } = new();
     public ContactOptions Contact { get; set; } = new();
+    public RetentionOptions Retention { get; set; } = new();
 
     // The run cadence lives in Kentico's Scheduled Tasks app (kentico-admin/applications/
     // scheduled-tasks). The Sentinel task is discovered on startup via the
@@ -70,6 +71,26 @@ public sealed class SentinelOptions
         /// of the remaining entries. The per-scan summary entry is always written regardless.
         /// </summary>
         public int MaxEntriesPerScan { get; set; } = 50;
+    }
+
+    public sealed class RetentionOptions
+    {
+        /// <summary>
+        /// Keep only the N most recent scan runs; older runs (and every
+        /// <c>RefinedElement_SentinelFinding</c> row that FK's to them) are trimmed after each
+        /// successful scan. Default 100 — at a daily cadence that's ~3 months of history, which
+        /// is enough for week-over-week / month-over-month diffs without unbounded growth
+        /// (730 rows + 50k-500k findings for a 2-year-old install otherwise).
+        /// <para>
+        /// Ack rows (<c>RefinedElement_SentinelFindingAck</c>) are NEVER pruned here — acks are
+        /// keyed by fingerprint and survive scan regeneration by design. Trimming them would
+        /// unsuppress findings that operators have already triaged.
+        /// </para>
+        /// <para>
+        /// Set to <c>0</c> or a negative value to disable trimming entirely (keeps forever).
+        /// </para>
+        /// </summary>
+        public int MaxScanRunsToKeep { get; set; } = 100;
     }
 
     public sealed class ContactOptions

@@ -69,6 +69,16 @@ public static class RemediationGuide
             "Triage recent CMS_EventLog errors",
             "The event log has error-level entries from the last N days (default 7). Kentico writes exceptions here — some are transient, some are chronic.",
             "Open the Kentico Event log app and filter by the source reported in the finding. Group repeated entries by exception type. Deploy fixes for anything reproducible; open an issue for anything that looks environmental."),
+
+        ["CNT010"] = new(
+            "Remove stale unused images",
+            "An image content item has no inbound references AND hasn't been edited in longer than your staleness threshold. Binary assets accrue more storage per item than structured content, so cleaning these up has outsized impact on DB / media-library size.",
+            "Open the item in Content Hub → Images. Confirm it's genuinely unreferenced (check offline uses — email templates, exported docs — that wouldn't show in CMS_ContentItemReference). If safe, delete. Bulk cleanup: select all CNT010 in Scan detail, sort by age, batch-delete the oldest tier first."),
+
+        ["CNT011"] = new(
+            "Remove stale unused documents / files",
+            "A file or document content item has no inbound references AND hasn't been edited recently. PDFs, Word docs, contracts, and other binary attachments — the cleanup story mirrors CNT010 but the deletion approval chain often differs (documents may need legal review).",
+            "Open the item in Content Hub → Files / Documents. Verify no offline references — a contract PDF linked from an email template or static HTML would appear orphaned but still be served. If confirmed safe, delete. Bulk: CNT011 in Scan detail, sort by age, batch-delete oldest tier."),
     }.ToFrozenDictionary(StringComparer.OrdinalIgnoreCase);
 
     /// <summary>

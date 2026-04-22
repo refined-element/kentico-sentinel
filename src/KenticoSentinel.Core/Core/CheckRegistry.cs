@@ -24,5 +24,7 @@ public static class CheckRegistry
         new OrphanedMediaCheck(),            // CNT004
         new MalformedWidgetsCheck(),         // CNT005
         new EventLogCheck(),                 // CNT006
+        new UnusedImagesCheck(),             // CNT010
+        new UnusedDocumentsCheck(),          // CNT011
     ];
 }
