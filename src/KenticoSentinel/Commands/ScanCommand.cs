@@ -45,9 +45,9 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
         [CommandOption("--event-log-days")]
         public int EventLogDays { get; init; } = 30;
 
-        [Description("Fail the process with a non-zero exit code if any finding has severity >= this threshold. One of: info, warning, error.")]
+        [Description("Fail the process with exit code 2 if any finding has severity at or above this threshold. One of: Info, Warning, Error, None. Defaults to None (always exit 0 unless the scan crashes) so adding --fail-on is an explicit opt-in to PR-gate behavior.")]
         [CommandOption("--fail-on")]
-        public string FailOn { get; init; } = "error";
+        public string FailOn { get; init; } = nameof(FailOnThreshold.None);
 
         [Description("Override the quote endpoint baked into the HTML report's submit button. Also reads the SENTINEL_QUOTE_ENDPOINT env var. Defaults to Refined Element's production endpoint.")]
         [CommandOption("--quote-endpoint")]
@@ -56,10 +56,10 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
 
     protected override async Task<int> ExecuteAsync(CommandContext context, Settings settings, CancellationToken cancellationToken)
     {
-        if (!Enum.TryParse<Severity>(settings.FailOn, ignoreCase: true, out var failOn))
+        if (!Enum.TryParse<FailOnThreshold>(settings.FailOn, ignoreCase: true, out var failOn))
         {
-            AnsiConsole.MarkupLine($"[red]Invalid --fail-on value '{settings.FailOn}'. Use info, warning, or error.[/]");
-            return 2;
+            AnsiConsole.MarkupLine($"[red]Invalid --fail-on value '{Markup.Escape(settings.FailOn)}'. Use Info, Warning, Error, or None.[/]");
+            return ScanExitCode.Error;
         }
 
         string repoPath;
@@ -72,7 +72,7 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
             catch (ArgumentException ex)
             {
                 AnsiConsole.MarkupLine($"[red]{Markup.Escape(ex.Message)}[/]");
-                return 2;
+                return ScanExitCode.Error;
             }
 
             AnsiConsole.MarkupLine($"[dim]Cloning [cyan]{Markup.Escape(url)}[/]{(settings.Ref is null ? "" : $" at [cyan]{Markup.Escape(settings.Ref)}[/]")}…[/]");
@@ -81,7 +81,7 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
             if (!clone.Success || clone.ClonePath is null)
             {
                 AnsiConsole.MarkupLine($"[red]Clone failed:[/] {Markup.Escape(clone.ErrorMessage ?? "unknown error")}");
-                return 2;
+                return ScanExitCode.Error;
             }
 
             repoPath = clone.ClonePath;
@@ -93,7 +93,7 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
             if (!Directory.Exists(repoPath))
             {
                 AnsiConsole.MarkupLine($"[red]Path not found:[/] {repoPath}");
-                return 2;
+                return ScanExitCode.Error;
             }
         }
 
@@ -146,7 +146,20 @@ public sealed class ScanCommand : AsyncCommand<ScanCommand.Settings>
             AnsiConsole.MarkupLine($"[dim]Clone kept at {Markup.Escape(repoPath)}[/]");
         }
 
-        return result.MaxSeverity() >= failOn && result.Findings.Count > 0 ? 1 : 0;
+        var exitCode = ScanExitCode.Evaluate(result.Findings, failOn);
+        if (exitCode == ScanExitCode.ThresholdTripped)
+        {
+            // Tell CI exactly why the build failed. Counting is cheap and the message is
+            // the first thing a sleepy on-caller reads in a failed pipeline log.
+            var count = ScanExitCode.CountAtOrAboveThreshold(result.Findings, failOn);
+            var label = failOn == FailOnThreshold.Info
+                ? "finding(s)"
+                : $"{failOn}-or-higher finding(s)";
+            AnsiConsole.MarkupLine(
+                $"\n[red]Threshold '{failOn}' tripped — {count} {label} detected. Exiting with code {ScanExitCode.ThresholdTripped}.[/]");
+        }
+
+        return exitCode;
     }
 
     private static void PrintSummary(ScanResult result)
