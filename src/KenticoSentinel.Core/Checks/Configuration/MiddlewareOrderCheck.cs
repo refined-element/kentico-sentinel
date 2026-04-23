@@ -16,6 +16,16 @@ public sealed partial class MiddlewareOrderCheck : ICheck
 
     public Task<IReadOnlyList<Finding>> RunAsync(ScanContext context, CancellationToken cancellationToken)
     {
+        // Embedded-mode no-op: a deployed XbyK site ships compiled DLLs only — Program.cs is not
+        // present at runtime on the app server. Emitting a "No Program.cs found" INFO finding here
+        // is technically accurate but reads as alarming to non-technical operators browsing the
+        // admin dashboard, and the middleware order was already verified at build time. The CLI path
+        // (IsEmbeddedHost == false) keeps running the full check against a source repo.
+        if (context.IsEmbeddedHost)
+        {
+            return Task.FromResult<IReadOnlyList<Finding>>(Array.Empty<Finding>());
+        }
+
         var findings = new List<Finding>();
         var programCs = Path.Combine(context.RepoPath, "Program.cs");
         if (!File.Exists(programCs))

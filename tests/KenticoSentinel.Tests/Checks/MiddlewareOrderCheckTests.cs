@@ -65,4 +65,26 @@ public class MiddlewareOrderCheckTests
 
         Assert.Contains(findings, f => f.Severity == Severity.Error && f.Message.Contains("contiguous"));
     }
+
+    /// <summary>
+    /// Embedded mode (scheduled task running inside a deployed XbyK site) must skip CFG002 entirely.
+    /// A deployed site has only compiled DLLs — no Program.cs — and the check's "No Program.cs found"
+    /// INFO reads as alarming to operators browsing the admin dashboard. The CLI path is unchanged.
+    /// </summary>
+    [Fact]
+    public async Task Embedded_mode_skips_check_entirely_even_when_program_cs_missing()
+    {
+        using var repo = new TempRepo(); // deliberately no Program.cs written
+
+        var embeddedCtx = new ScanContext
+        {
+            RepoPath = repo.Path,
+            HttpClientFactory = new FakeHttpClientFactory(),
+            IsEmbeddedHost = true,
+        };
+
+        var findings = await new MiddlewareOrderCheck().RunAsync(embeddedCtx, CancellationToken.None);
+
+        Assert.Empty(findings);
+    }
 }

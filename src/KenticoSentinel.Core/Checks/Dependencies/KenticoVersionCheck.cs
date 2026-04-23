@@ -25,6 +25,16 @@ public sealed partial class KenticoVersionCheck : ICheck
 
     public async Task<IReadOnlyList<Finding>> RunAsync(ScanContext context, CancellationToken cancellationToken)
     {
+        // Embedded-mode no-op: a deployed XbyK site has no .csproj next to the running DLLs, so
+        // the PackageReference scan would always come up empty and the check would emit a misleading
+        // "No Kentico.Xperience.* PackageReference found" INFO. The version is already verified at
+        // build time on the dev/CI side where the CLI runs, and emitting it to operators browsing
+        // the admin dashboard is noise. The CLI path (IsEmbeddedHost == false) keeps full behavior.
+        if (context.IsEmbeddedHost)
+        {
+            return Array.Empty<Finding>();
+        }
+
         var findings = new List<Finding>();
         var (anchorPackage, detectedVersion, sourceFile) = FindAnchorReference(context.RepoPath);
 
