@@ -41,6 +41,16 @@ public sealed class OutdatedPackagesCheck : ICheck
 
     public async Task<IReadOnlyList<Finding>> RunAsync(ScanContext context, CancellationToken cancellationToken)
     {
+        // Embedded-mode no-op: a deployed XbyK site has no .csproj next to the running DLLs, so
+        // `dotnet list package` would produce nothing useful. Rather than surface a confusing INFO
+        // about a missing .csproj to operators browsing the admin dashboard, we skip the check
+        // entirely — package versions are verified at build time on the dev/CI side where the CLI
+        // runs. The CLI path (IsEmbeddedHost == false) retains full behavior against a source repo.
+        if (context.IsEmbeddedHost)
+        {
+            return Array.Empty<Finding>();
+        }
+
         var findings = new List<Finding>();
         var psi = new ProcessStartInfo
         {
@@ -93,6 +103,14 @@ public sealed class OutdatedPackagesCheck : ICheck
         try
         {
             using var doc = JsonDocument.Parse(dotnetListJson);
+
+            // `dotnet list package --format json` emits the feed URLs the CLI actually resolved against
+            // at the document root. Scoping the prerelease fallback to these sources prevents two
+            // bugs: leaking private package IDs to nuget.org when the package only exists on an
+            // internal feed, and returning a stale "latest" from nuget.org when a newer version lives
+            // on that internal feed.
+            var declaredSources = ExtractSources(doc.RootElement);
+
             if (!doc.RootElement.TryGetProperty("projects", out var projects)) return findings;
 
             foreach (var project in projects.EnumerateArray())
@@ -111,13 +129,14 @@ public sealed class OutdatedPackagesCheck : ICheck
                         var latest = pkg.GetProperty("latestVersion").GetString() ?? "(unknown)";
 
                         // Workaround for `dotnet list package --outdated` filtering out prereleases:
-                        // when the installed version is a prerelease, ask nuget.org directly for the latest
-                        // prerelease and use that instead of the "Not found at the sources" sentinel.
+                        // when the installed version is a prerelease, ask the repo's declared sources
+                        // directly for the latest prerelease and use that instead of the "Not found
+                        // at the sources" sentinel.
                         if (string.Equals(latest, NotFoundSentinel, StringComparison.Ordinal)
                             && IsPrerelease(resolved))
                         {
                             var prereleaseLatest = await _versionLookup
-                                .GetLatestVersionAsync(id, includePrerelease: true, cancellationToken)
+                                .GetLatestVersionAsync(id, includePrerelease: true, declaredSources, cancellationToken)
                                 .ConfigureAwait(false);
 
                             if (!string.IsNullOrEmpty(prereleaseLatest))
@@ -153,6 +172,27 @@ public sealed class OutdatedPackagesCheck : ICheck
         }
 
         return findings;
+    }
+
+    private static IReadOnlyList<string>? ExtractSources(JsonElement root)
+    {
+        if (!root.TryGetProperty("sources", out var sources) || sources.ValueKind != JsonValueKind.Array)
+        {
+            return null;
+        }
+
+        var list = new List<string>();
+        foreach (var s in sources.EnumerateArray())
+        {
+            if (s.ValueKind != JsonValueKind.String) continue;
+            var value = s.GetString();
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                list.Add(value);
+            }
+        }
+
+        return list.Count == 0 ? null : list;
     }
 
     private static bool IsPrerelease(string version) =>

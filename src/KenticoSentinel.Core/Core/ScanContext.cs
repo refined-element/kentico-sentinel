@@ -20,6 +20,17 @@ public sealed record ScanContext
     /// <summary>HTTP client factory for checks that reach out to external services (NuGet feed, Kentico release feed).</summary>
     public required IHttpClientFactory HttpClientFactory { get; init; }
 
+    /// <summary>
+    /// True when the scan is running embedded inside a deployed Xperience by Kentico site (via
+    /// <c>RefinedElement.Kentico.Sentinel.XbyK</c>'s scheduled task) rather than from the standalone CLI
+    /// against a source repo. Source-file checks (CFG002, DEP001, VER001) skip themselves entirely when
+    /// this is true because a deployed site has only compiled DLLs — no <c>Program.cs</c>, no <c>.csproj</c>.
+    /// Emitting "source file not found" findings in that environment is technically accurate but alarms
+    /// non-technical operators reading the admin dashboard. Defaults to <c>false</c> so the CLI keeps
+    /// behaving exactly as before.
+    /// </summary>
+    public bool IsEmbeddedHost { get; init; }
+
     /// <summary>True when a connection string is present and runtime checks should execute.</summary>
     public bool RuntimeEnabled => !string.IsNullOrWhiteSpace(ConnectionString);
 }

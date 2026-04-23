@@ -256,6 +256,11 @@ public sealed class SentinelScanService(
             StaleDays = options.RuntimeChecks.StaleDays,
             EventLogDays = options.RuntimeChecks.EventLogDays,
             HttpClientFactory = factory,
+            // Signal source-file checks (CFG002, DEP001, VER001) to skip themselves. A deployed XbyK
+            // site ships compiled DLLs only — there is no Program.cs or .csproj at runtime, so those
+            // checks would emit misleading "source file not found" findings to operators. They still
+            // run in full via the CLI where IsEmbeddedHost defaults to false.
+            IsEmbeddedHost = true,
         };
     }
 }

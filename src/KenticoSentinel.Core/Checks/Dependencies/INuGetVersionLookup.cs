@@ -14,4 +14,21 @@ public interface INuGetVersionLookup
     /// versions (those with a `-` suffix like `0.4.3-alpha`) are considered.
     /// </summary>
     Task<string?> GetLatestVersionAsync(string packageId, bool includePrerelease, CancellationToken cancellationToken);
+
+    /// <summary>
+    /// Same as <see cref="GetLatestVersionAsync(string, bool, CancellationToken)"/>, but scopes the lookup to
+    /// the declared NuGet <paramref name="sources"/> (typically the <c>sources</c> array from
+    /// <c>dotnet list package --format json</c>). When <paramref name="sources"/> is <c>null</c> or empty,
+    /// implementations fall back to nuget.org so callers that don't plumb source information through keep
+    /// their existing behavior. Querying only declared sources avoids (a) returning a stale "latest" when a
+    /// newer version exists on a private feed, and (b) leaking private package IDs to nuget.org.
+    /// </summary>
+    Task<string?> GetLatestVersionAsync(
+        string packageId,
+        bool includePrerelease,
+        IReadOnlyList<string>? sources,
+        CancellationToken cancellationToken)
+#pragma warning disable CA1033 // Default interface implementation keeps existing implementations source-compatible.
+        => GetLatestVersionAsync(packageId, includePrerelease, cancellationToken);
+#pragma warning restore CA1033
 }
