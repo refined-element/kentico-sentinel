@@ -1,6 +1,7 @@
 using CMS.Core;
 using CMS.DataEngine;
 using CMS.FormEngine;
+using CMS.Membership;
 using CMS.Modules;
 using CMS.Scheduler;
 
@@ -165,7 +166,7 @@ public class SentinelModuleInstaller(
         form.AddFormItem(TextField(nameof(SentinelFindingAckInfo.SentinelFindingAckFingerprintHash), "text", size: 64));
         form.AddFormItem(TextField(nameof(SentinelFindingAckInfo.SentinelFindingAckState), "text", size: 16));
         form.AddFormItem(Field(nameof(SentinelFindingAckInfo.SentinelFindingAckSnoozeUntil), "datetime", allowEmpty: true));
-        form.AddFormItem(Field(nameof(SentinelFindingAckInfo.SentinelFindingAckUserID), "integer"));
+        form.AddFormItem(UserField(nameof(SentinelFindingAckInfo.SentinelFindingAckUserID)));
         form.AddFormItem(Field(nameof(SentinelFindingAckInfo.SentinelFindingAckAckedAt), "datetime"));
         form.AddFormItem(TextField(nameof(SentinelFindingAckInfo.SentinelFindingAckNote), "longtext", allowEmpty: true));
 
@@ -196,7 +197,7 @@ public class SentinelModuleInstaller(
         form.AddFormItem(TextField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEmailDigestRecipients), "longtext", allowEmpty: true));
         form.AddFormItem(TextField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEmailDigestSeverityThreshold), "text", size: 16));
         form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideEmailDigestOnlyWhenThresholdFindings), "boolean"));
-        form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideLastModifiedBy), "integer"));
+        form.AddFormItem(UserField(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideLastModifiedBy)));
         form.AddFormItem(Field(nameof(SentinelSettingsOverrideInfo.SentinelSettingsOverrideLastModifiedAt), "datetime"));
 
         SetFormDefinition(info, form);
@@ -228,6 +229,30 @@ public class SentinelModuleInstaller(
         Visible = true,
         Enabled = true,
         Size = size,
+    };
+
+    /// <summary>
+    /// Integer FK column that references a Kentico user (<c>cms.user</c>). Use for audit
+    /// columns like "acknowledged by" or "last modified by" so the admin UI can resolve the
+    /// int to a user display name / link instead of showing a raw ID, and so Kentico's
+    /// dependency tracking understands the relationship.
+    /// </summary>
+    /// <remarks>
+    /// <see cref="ObjectDependencyEnum.NotRequired"/> (soft reference) is intentional: if a
+    /// user is deleted we keep the audit row with the now-orphaned user ID rather than
+    /// cascade-deleting the ack / override history. Required would take the row with the
+    /// user, which is the wrong semantic for an audit trail — removing an admin should not
+    /// rewrite the record of what they acknowledged.
+    /// </remarks>
+    private static FormFieldInfo UserField(string name) => new()
+    {
+        Name = name,
+        DataType = "integer",
+        AllowEmpty = false,
+        Visible = true,
+        Enabled = true,
+        ReferenceToObjectType = UserInfo.OBJECT_TYPE,
+        ReferenceType = ObjectDependencyEnum.NotRequired,
     };
 
     private static void SetFormDefinition(DataClassInfo info, FormInfo form)
