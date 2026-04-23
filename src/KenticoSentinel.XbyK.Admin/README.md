@@ -12,14 +12,14 @@ What shows up in **Configuration → Sentinel**:
 - **Scan detail** — drill into a single scan, per-finding acknowledge / snooze / revoke (individual and bulk)
 - **Compare scans** — fingerprint-keyed diff (Introduced / Resolved / Still open)
 - **Request a quote** — in-admin form that submits a sanitized scan snapshot to Refined Element
-- **Settings** — read-only display of effective config
+- **Settings** — editable, DB-backed overrides win over `appsettings.json` (tune thresholds, cadence, recipients without a redeploy)
 
 The client is a React app bundled via webpack and embedded as a Kentico admin client module. The npm build runs automatically on `dotnet build`, so a fresh clone `dotnet build`s without extra steps.
 
 ## Install
 
 ```xml
-<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK.Admin" Version="0.4.0-alpha" />
+<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK.Admin" Version="0.4.3-alpha" />
 ```
 
 **No extra `Program.cs` wiring.** The existing `AddKenticoSentinel()` call in the headless package covers DI; this package just lights up the admin pages. Both packages must be on the same version.

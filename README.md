@@ -96,15 +96,29 @@ The companion package **`RefinedElement.Kentico.Sentinel.XbyK.Admin`** adds **Co
 - **Scan detail** — drill into a single scan, per-finding acknowledge / snooze / revoke (individual and bulk)
 - **Compare scans** — fingerprint-keyed diff: Introduced / Resolved / Still open
 - **Request a quote** — in-admin form that submits a sanitized scan snapshot to Refined Element
-- **Settings** — read-only display of effective config
+- **Settings** — editable, DB-backed overrides win over `appsettings.json` (tune thresholds, cadence, recipients without a redeploy)
 
-Install (once v0.3.0-alpha is published to NuGet):
+Install:
 
 ```xml
-<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK.Admin" Version="0.3.0-alpha" />
+<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK.Admin" Version="0.4.3-alpha" />
 ```
 
 No extra `Program.cs` wiring — the existing `AddKenticoSentinel()` call covers DI. The admin pages surface automatically.
+
+#### Screenshots
+
+| Dashboard | Scan detail |
+|---|---|
+| ![Dashboard](docs/screenshots/Dashboard.png) | ![Scan detail](docs/screenshots/Scan%20Detail.png) |
+
+| Settings (editable) | Compare scans |
+|---|---|
+| ![Settings](docs/screenshots/Settings.png) | ![Diff view](docs/screenshots/Diff%20View.png) |
+
+| Snooze action |
+|---|
+| ![Snooze action](docs/screenshots/Snooze%20Action.png) |
 
 ## Uninstall
 

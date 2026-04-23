@@ -20,7 +20,7 @@ Use this package directly when you want to run Sentinel's checks inside your own
 ## Install
 
 ```xml
-<PackageReference Include="RefinedElement.Kentico.Sentinel.Core" Version="0.4.0-alpha" />
+<PackageReference Include="RefinedElement.Kentico.Sentinel.Core" Version="0.4.3-alpha" />
 ```
 
 ## Minimal usage

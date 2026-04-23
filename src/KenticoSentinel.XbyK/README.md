@@ -19,7 +19,7 @@ Pair with **`RefinedElement.Kentico.Sentinel.XbyK.Admin`** to get the in-admin D
 ## Install
 
 ```xml
-<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK" Version="0.4.0-alpha" />
+<PackageReference Include="RefinedElement.Kentico.Sentinel.XbyK" Version="0.4.3-alpha" />
 ```
 
 Targets `.NET 9`, pins `Kentico.Xperience.Core` / `Kentico.Xperience.WebApp` to `[31.0.0, 32.0.0)`.
