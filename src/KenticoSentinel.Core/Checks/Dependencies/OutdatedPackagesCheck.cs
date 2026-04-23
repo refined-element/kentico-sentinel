@@ -8,8 +8,28 @@ namespace RefinedElement.Kentico.Sentinel.Checks.Dependencies;
 /// DEP001 — Shells out to `dotnet list package --outdated --format json` in the repo root and reports
 /// every outdated package. Major-version drift is a Warning; minor/patch is Info.
 /// </summary>
+/// <remarks>
+/// `dotnet list package --outdated` filters to stable versions only. When the installed version is itself a
+/// prerelease (e.g. `0.4.3-alpha`), the command reports <c>"Not found at the sources"</c> instead of the actual
+/// latest prerelease. We detect that case and fall back to an <see cref="INuGetVersionLookup"/> with
+/// <c>includePrerelease: true</c> so the check reports accurate results for prerelease-installed packages.
+/// </remarks>
 public sealed class OutdatedPackagesCheck : ICheck
 {
+    // The sentinel string `dotnet list package --outdated --format json` emits for packages it can't resolve
+    // on the configured sources (most commonly: prerelease-installed packages, because the default search
+    // excludes prereleases).
+    internal const string NotFoundSentinel = "Not found at the sources";
+
+    private readonly INuGetVersionLookup _versionLookup;
+
+    public OutdatedPackagesCheck() : this(new NuGetOrgVersionLookup()) { }
+
+    public OutdatedPackagesCheck(INuGetVersionLookup versionLookup)
+    {
+        _versionLookup = versionLookup;
+    }
+
     public string RuleId => "DEP001";
     public string Title => "Outdated NuGet packages";
     public string Category => "Dependencies";
@@ -56,9 +76,23 @@ public sealed class OutdatedPackagesCheck : ICheck
             return findings;
         }
 
+        return await ParseAndBuildFindingsAsync(stdout, context.RepoPath, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Parses the JSON output of <c>dotnet list package --outdated --format json</c> and produces findings.
+    /// Internal so tests can drive the parsing + prerelease-fallback logic without shelling out to
+    /// <c>dotnet list</c> (which requires a real restored .csproj).
+    /// </summary>
+    internal async Task<IReadOnlyList<Finding>> ParseAndBuildFindingsAsync(
+        string dotnetListJson,
+        string repoPath,
+        CancellationToken cancellationToken)
+    {
+        var findings = new List<Finding>();
         try
         {
-            using var doc = JsonDocument.Parse(stdout);
+            using var doc = JsonDocument.Parse(dotnetListJson);
             if (!doc.RootElement.TryGetProperty("projects", out var projects)) return findings;
 
             foreach (var project in projects.EnumerateArray())
@@ -75,6 +109,29 @@ public sealed class OutdatedPackagesCheck : ICheck
                         var id = pkg.GetProperty("id").GetString() ?? "(unknown)";
                         var resolved = pkg.GetProperty("resolvedVersion").GetString() ?? "(unknown)";
                         var latest = pkg.GetProperty("latestVersion").GetString() ?? "(unknown)";
+
+                        // Workaround for `dotnet list package --outdated` filtering out prereleases:
+                        // when the installed version is a prerelease, ask nuget.org directly for the latest
+                        // prerelease and use that instead of the "Not found at the sources" sentinel.
+                        if (string.Equals(latest, NotFoundSentinel, StringComparison.Ordinal)
+                            && IsPrerelease(resolved))
+                        {
+                            var prereleaseLatest = await _versionLookup
+                                .GetLatestVersionAsync(id, includePrerelease: true, cancellationToken)
+                                .ConfigureAwait(false);
+
+                            if (!string.IsNullOrEmpty(prereleaseLatest))
+                            {
+                                if (string.Equals(prereleaseLatest, resolved, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    // Already on the latest prerelease — nothing to report.
+                                    continue;
+                                }
+
+                                latest = prereleaseLatest;
+                            }
+                        }
+
                         var severity = ClassifyDrift(resolved, latest);
 
                         findings.Add(new Finding(
@@ -92,11 +149,14 @@ public sealed class OutdatedPackagesCheck : ICheck
             findings.Add(new Finding(
                 RuleId, Title, Category, Severity.Warning,
                 $"Could not parse `dotnet list package` output: {ex.Message}",
-                Location: context.RepoPath));
+                Location: repoPath));
         }
 
         return findings;
     }
+
+    private static bool IsPrerelease(string version) =>
+        !string.IsNullOrEmpty(version) && version.Contains('-', StringComparison.Ordinal);
 
     private static Severity ClassifyDrift(string current, string latest)
     {
